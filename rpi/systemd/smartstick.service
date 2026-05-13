@@ -1,0 +1,25 @@
+[Unit]
+Description=Smart Stick BVI Backend (FastAPI)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/home/pi/smart-stick/rpi
+EnvironmentFile=/home/pi/smart-stick/rpi/.env
+ExecStart=/home/pi/smart-stick/rpi/.venv/bin/python main.py
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=read-only
+ReadWritePaths=/home/pi/data /home/pi/smart-stick/rpi
+
+[Install]
+WantedBy=multi-user.target
