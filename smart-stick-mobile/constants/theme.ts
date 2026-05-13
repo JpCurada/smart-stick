@@ -25,12 +25,12 @@ export const Palette = {
   text: '#1a1a1a',
   textMuted: '#6b7280',
 
-  border: '#e5e7eb',
-  borderStrong: '#d1d5db',
+  border: '#f9a8d4', // light pink border
+  borderStrong: '#f472b6',
 
-  success: '#16a34a',
-  warning: '#f59e0b',
-  critical: '#dc2626',
+  success: '#ec4899', // bright pink for success
+  warning: '#fb7185', // rose/pink for warning
+  critical: '#9d174d', // deep pink for critical
   onPrimary: '#ffffff',
 } as const;
 

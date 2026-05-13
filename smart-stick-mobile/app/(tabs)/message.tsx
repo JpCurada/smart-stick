@@ -130,9 +130,9 @@ export default function MessageScreen() {
                     </ThemedText>
                     <View style={styles.statusRow}>
                       {m.delivered ? (
-                        <Check size={14} color="#16a34a" />
+                        <Check size={14} color={Palette.success} />
                       ) : (
-                        <Hourglass size={14} color="#f59e0b" />
+                        <Hourglass size={14} color={Palette.warning} />
                       )}
                       <ThemedText style={styles.metaSmall}>
                         {m.delivered ? 'delivered' : 'queued'}
@@ -192,7 +192,7 @@ const styles = StyleSheet.create({
   },
   feedback: {
     textAlign: 'center',
-    color: '#16a34a',
+    color: Palette.success,
   },
   historyItem: {
     padding: 12,

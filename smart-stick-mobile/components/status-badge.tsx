@@ -1,6 +1,7 @@
 import { StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { Palette } from '@/constants/theme';
 
 interface StatusBadgeProps {
   online: boolean;
@@ -9,7 +10,7 @@ interface StatusBadgeProps {
 
 export function StatusBadge({ online, label }: StatusBadgeProps) {
   const text = label ?? (online ? 'Online' : 'Offline');
-  const color = online ? '#16a34a' : '#dc2626';
+  const color = online ? Palette.success : Palette.critical;
   return (
     <View style={[styles.badge, { backgroundColor: color }]}>
       <ThemedText style={styles.text}>{text}</ThemedText>

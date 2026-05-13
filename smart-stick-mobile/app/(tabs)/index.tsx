@@ -14,6 +14,7 @@ import { StatusBadge } from '@/components/status-badge';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { POLL_INTERVALS } from '@/constants/api';
+import { Palette } from '@/constants/theme';
 import { usePoll } from '@/hooks/use-poll';
 import { api } from '@/lib/api';
 
@@ -99,16 +100,16 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: 10,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#dc2626',
+    borderColor: Palette.critical,
     gap: 6,
     marginTop: 8,
   },
   errorTitle: {
-    color: '#dc2626',
+    color: Palette.critical,
     fontWeight: '700',
   },
   errorBody: {
-    color: '#dc2626',
+    color: Palette.critical,
     opacity: 0.9,
   },
 });

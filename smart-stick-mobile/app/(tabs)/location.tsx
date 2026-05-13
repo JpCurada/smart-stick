@@ -150,7 +150,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(127,127,127,0.3)',
   },
   errorBanner: {
-    color: '#dc2626',
+    color: Palette.critical,
     textAlign: 'center',
   },
 });

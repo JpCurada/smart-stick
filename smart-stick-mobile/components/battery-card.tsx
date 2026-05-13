@@ -2,6 +2,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { Palette } from '@/constants/theme';
 import type { BatteryStatus, HealthStatus } from '@/lib/types';
 
 interface BatteryCardProps {
@@ -9,9 +10,9 @@ interface BatteryCardProps {
 }
 
 const HEALTH_COLORS: Record<HealthStatus, string> = {
-  good: '#16a34a',
-  warning: '#f59e0b',
-  critical: '#dc2626',
+  good: Palette.success,
+  warning: Palette.warning,
+  critical: Palette.critical,
 };
 
 export function BatteryCard({ battery }: BatteryCardProps) {

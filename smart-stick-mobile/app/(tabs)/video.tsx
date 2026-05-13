@@ -18,6 +18,7 @@ import { InfoRow } from '@/components/info-row';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { POLL_INTERVALS } from '@/constants/api';
+import { Palette } from '@/constants/theme';
 import { usePoll } from '@/hooks/use-poll';
 import { api } from '@/lib/api';
 
@@ -68,13 +69,13 @@ export default function VideoScreen() {
           {streaming ? (
             <ActionButton
               title="Stop Stream"
-              color="#6b7280"
+              color={Palette.warning}
               onPress={() => setStreaming(false)}
             />
           ) : (
             <ActionButton
               title="Start Stream"
-              color="#16a34a"
+              color={Palette.success}
               onPress={() => setStreaming(true)}
             />
           )}
@@ -146,14 +147,14 @@ const styles = StyleSheet.create({
   alertCard: {
     padding: 14,
     borderRadius: 10,
-    backgroundColor: '#fde68a',
+    backgroundColor: Palette.warning,
   },
   alertTitle: {
     fontWeight: '700',
-    color: '#92400e',
+    color: '#fff',
   },
   alertBody: {
-    color: '#92400e',
+    color: '#fff',
     textTransform: 'capitalize',
   },
 });

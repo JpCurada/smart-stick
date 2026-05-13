@@ -12,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ActionButton } from '@/components/action-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { Palette } from '@/constants/theme';
 import { api } from '@/lib/api';
 
 interface FeedbackState {
@@ -65,14 +66,14 @@ export default function FindScreen() {
           <ActionButton
             title="Vibrate Stick"
             icon={Vibrate}
-            color="#16a34a"
+            color={Palette.primary}
             onPress={handleVibrate}
             loading={vibrateLoading}
           />
           <ActionButton
             title="Play SOS Sound"
             icon={Volume2}
-            color="#ea580c"
+            color={Palette.warning}
             onPress={handleSound}
             loading={soundLoading}
           />
@@ -82,7 +83,7 @@ export default function FindScreen() {
           <ThemedView
             style={[
               styles.feedback,
-              { backgroundColor: feedback.success ? '#16a34a' : '#dc2626' },
+              { backgroundColor: feedback.success ? Palette.success : Palette.critical },
             ]}
           >
             <ThemedText style={styles.feedbackText}>{feedback.message}</ThemedText>
