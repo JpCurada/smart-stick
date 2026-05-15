@@ -1,20 +1,13 @@
 /**
- * Tab 5: VIDEO — live camera feed.
- *
- * MVP polls /api/latest_frame at ~1 FPS by appending a cache-busting
- * timestamp. WebSocket streaming is Phase 2.
- *
- * Note: the backend currently returns HTTP 501 for /api/latest_frame.
- * The UI still renders the polling shell so the wiring is in place — the
- * Image just shows a friendly fallback until the backend serves frames.
+ * Tab 5: VIDEO — live MJPEG camera feed from the stick.
  */
-import { Image } from 'expo-image';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ActionButton } from '@/components/action-button';
 import { InfoRow } from '@/components/info-row';
+import { MjpegStream } from '@/components/mjpeg-stream';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { POLL_INTERVALS } from '@/constants/api';
@@ -24,20 +17,11 @@ import { api } from '@/lib/api';
 
 export default function VideoScreen() {
   const [streaming, setStreaming] = useState(false);
-  const [frameUrl, setFrameUrl] = useState<string | null>(null);
 
   const detections = usePoll(
     useCallback(() => api.latestDetections(), []),
     POLL_INTERVALS.detections,
   );
-
-  useEffect(() => {
-    if (!streaming) return;
-    const tick = () => setFrameUrl(api.latestFrameUrl());
-    tick();
-    const id = setInterval(tick, POLL_INTERVALS.cameraFrame);
-    return () => clearInterval(id);
-  }, [streaming]);
 
   const fps = detections.data?.fps ?? null;
   const inferenceMs = detections.data?.inference_time_ms ?? null;
@@ -49,17 +33,12 @@ export default function VideoScreen() {
         <ThemedText type="title">Video</ThemedText>
 
         <ThemedView style={styles.frame}>
-          {streaming && frameUrl ? (
-            <Image
-              source={{ uri: frameUrl }}
-              style={styles.frameImage}
-              contentFit="cover"
-              cachePolicy="none"
-            />
+          {streaming ? (
+            <MjpegStream url={api.streamUrl()} />
           ) : (
             <View style={styles.framePlaceholder}>
               <ThemedText style={styles.framePlaceholderText}>
-                {streaming ? 'Loading frame…' : 'Press Start to view the camera.'}
+                Press Start to view the camera.
               </ThemedText>
             </View>
           )}
@@ -119,10 +98,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(127,127,127,0.3)',
-  },
-  frameImage: {
-    width: '100%',
-    height: '100%',
   },
   framePlaceholder: {
     flex: 1,

@@ -104,8 +104,6 @@ class DetectionLoop:
             return
 
         frame = reading.data["frame"]
-        if self._frame_buffer is not None:
-            self._frame_buffer.update(frame, time.time())
 
         inference_start = time.monotonic()
         predictions = self._yolo.predict(frame)
@@ -127,6 +125,10 @@ class DetectionLoop:
             if down_distance is not None and down_distance < 0.3:
                 detections.append(self._synthetic_detection(ObjectClass.STAIRS, down_distance))
 
+        if self._frame_buffer is not None:
+            annotated = self._annotate_frame(frame, predictions, detections)
+            self._frame_buffer.update(annotated, time.time())
+
         if self._on_detections is not None:
             meta = {
                 "inference_ms": self._last_inference_ms,
@@ -134,6 +136,50 @@ class DetectionLoop:
                 "frame_height": reading.data.get("height"),
             }
             self._on_detections(detections, meta)
+
+    def _annotate_frame(
+        self,
+        frame: object,
+        predictions: list[YoloPrediction],
+        detections: list[Detection],
+    ) -> object:
+        try:
+            import cv2  # type: ignore[import-not-found]
+        except Exception:
+            return frame
+
+        # Pair YOLO predictions with their fused-distance Detection (synthetic
+        # detections at the tail have no matching prediction and no bbox).
+        for pred, det in zip(predictions, detections, strict=False):
+            x1, y1, x2, y2 = pred.bbox
+            color = self._class_color(pred.object_class)
+            cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+            label = f"{pred.object_class.value} {pred.confidence:.2f}"
+            if det.distance_m < 99.0:
+                label += f"  {det.distance_m:.1f}m"
+            ((tw, th), baseline) = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
+            cv2.rectangle(frame, (x1, y1 - th - baseline - 4), (x1 + tw + 4, y1), color, -1)
+            cv2.putText(
+                frame,
+                label,
+                (x1 + 2, y1 - baseline - 2),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.5,
+                (255, 255, 255),
+                1,
+                cv2.LINE_AA,
+            )
+        return frame
+
+    @staticmethod
+    def _class_color(object_class: ObjectClass) -> tuple[int, int, int]:
+        palette: dict[ObjectClass, tuple[int, int, int]] = {
+            ObjectClass.PERSON: (0, 200, 0),
+            ObjectClass.CAR: (0, 140, 255),
+            ObjectClass.BICYCLE: (255, 140, 0),
+            ObjectClass.MOTORCYCLE: (255, 140, 0),
+        }
+        return palette.get(object_class, (60, 60, 220))
 
     def _build_detection(
         self,

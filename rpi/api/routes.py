@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi.responses import StreamingResponse
 
 from api.dependencies import Container, get_container
 from api.schemas import BuzzRequest, CommandAck, MessageRequest, VibrateRequest
@@ -124,6 +125,33 @@ def latest_frame(c: Container = Depends(_container)) -> Response:
         content=jpeg,
         media_type="image/jpeg",
         headers={"Cache-Control": "no-store"},
+    )
+
+
+@router.get("/stream")
+def stream(c: Container = Depends(_container)) -> StreamingResponse:
+    import time
+
+    boundary = "frame"
+
+    def generator():
+        last_ts = 0.0
+        target_interval = 1.0 / 15.0
+        while True:
+            jpeg, ts = c.frame_buffer.latest()
+            if jpeg is not None and ts != last_ts:
+                last_ts = ts
+                yield (
+                    b"--" + boundary.encode() + b"\r\n"
+                    b"Content-Type: image/jpeg\r\n"
+                    b"Content-Length: " + str(len(jpeg)).encode() + b"\r\n\r\n" + jpeg + b"\r\n"
+                )
+            time.sleep(target_interval)
+
+    return StreamingResponse(
+        generator(),
+        media_type=f"multipart/x-mixed-replace; boundary={boundary}",
+        headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
     )
 
 
