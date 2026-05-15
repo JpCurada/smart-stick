@@ -161,8 +161,9 @@ pi-fetch-model:
 	@echo "yolov8n.pt cached"
 
 # Start the backend in the foreground on the Pi (Ctrl+C to stop).
+# `exec` replaces the shell so Ctrl+C goes straight to uvicorn instead of make.
 pi-serve:
-	cd $(RPI_DIR_LOCAL) && $(abspath $(VENV))/bin/uvicorn api.app:create_app --factory \
+	cd $(RPI_DIR_LOCAL) && exec $(abspath $(VENV))/bin/uvicorn api.app:create_app --factory \
 	  --host 0.0.0.0 --port $(RPI_PORT) --log-level info
 
 # Hit the local health endpoint to confirm the server is up.
