@@ -28,6 +28,7 @@ from api.dependencies import Container  # noqa: E402
 from core.config import Config  # noqa: E402
 from detection.alert_engine import AlertEngine  # noqa: E402
 from detection.detector import DetectionLoop  # noqa: E402
+from detection.frame_buffer import FrameBuffer  # noqa: E402
 from output import BuzzerController, HapticsController, OutputQueue  # noqa: E402
 from sensors.battery import BatterySensor  # noqa: E402
 from services import (  # noqa: E402
@@ -93,12 +94,14 @@ def build_mock_container() -> Container:
     fake_overhead = FakeUltrasonic("ultrasonic_overhead")
     fake_down = FakeUltrasonic("ultrasonic_down")
 
+    frame_buffer = FrameBuffer()
     detection_loop = DetectionLoop(
         camera=fake_camera,      # type: ignore[arg-type]
         yolo=fake_yolo,          # type: ignore[arg-type]
         lidar=fake_lidar,        # type: ignore[arg-type]
         overhead_ultrasonic=fake_overhead,  # type: ignore[arg-type]
         down_ultrasonic=fake_down,          # type: ignore[arg-type]
+        frame_buffer=frame_buffer,
     )
     detection_service = DetectionService(
         loop=detection_loop,
@@ -142,4 +145,5 @@ def build_mock_container() -> Container:
         message_service=message_service,
         session_service=session_service,
         electrical_logger=electrical_logger,
+        frame_buffer=frame_buffer,
     )

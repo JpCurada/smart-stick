@@ -3,6 +3,7 @@
 from detection.alert_engine import AlertDecision, AlertEngine
 from detection.detector import DetectionLoop
 from detection.distance_fusion import fuse_distance
+from detection.frame_buffer import FrameBuffer
 from detection.patterns import pattern_for_object
 from detection.rate_limiter import RateLimiter
 from detection.tones import tone_for_alert
@@ -12,6 +13,7 @@ __all__ = [
     "AlertDecision",
     "AlertEngine",
     "DetectionLoop",
+    "FrameBuffer",
     "fuse_distance",
     "pattern_for_object",
     "RateLimiter",

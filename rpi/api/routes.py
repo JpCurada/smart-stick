@@ -117,10 +117,14 @@ def battery_status(c: Container = Depends(_container)) -> dict[str, Any]:
 
 @router.get("/latest_frame")
 def latest_frame(c: Container = Depends(_container)) -> Response:
-    # NB: the camera frame is held inside the detection loop; in the current
-    # implementation we surface only metadata. Returning a JPEG requires
-    # wiring a shared frame buffer in a future iteration.
-    raise HTTPException(status_code=501, detail="streaming not implemented")
+    jpeg, _ = c.frame_buffer.latest()
+    if jpeg is None:
+        raise HTTPException(status_code=503, detail="no frame available yet")
+    return Response(
+        content=jpeg,
+        media_type="image/jpeg",
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 # --------------------------- Haptics / Buzzer -------------------------------- #

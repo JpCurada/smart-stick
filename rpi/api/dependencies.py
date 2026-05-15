@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from core.config import Config
 from detection.alert_engine import AlertEngine
 from detection.detector import DetectionLoop
+from detection.frame_buffer import FrameBuffer
 from detection.yolo_model import YoloDetector
 from output import BuzzerController, HapticsController, OutputQueue, SpeakerController
 from sensors import (
@@ -61,6 +62,7 @@ class Container:
     message_service: MessageService
     session_service: SessionService
     electrical_logger: ElectricalLoggerService
+    frame_buffer: FrameBuffer
 
     def start_all(self) -> None:
         log = get_logger("api.container")
@@ -128,12 +130,14 @@ def build_container() -> Container:
         trigger_pin=Config.ULTRASONIC_DOWN_TRIG_PIN,
         echo_pin=Config.ULTRASONIC_DOWN_ECHO_PIN,
     )
+    frame_buffer = FrameBuffer()
     detection_loop = DetectionLoop(
         camera=camera,
         yolo=yolo,
         lidar=lidar,
         overhead_ultrasonic=overhead,
         down_ultrasonic=down,
+        frame_buffer=frame_buffer,
     )
     detection_service = DetectionService(
         loop=detection_loop,
@@ -176,6 +180,7 @@ def build_container() -> Container:
         message_service=message_service,
         session_service=session_service,
         electrical_logger=electrical_logger,
+        frame_buffer=frame_buffer,
     )
 
 

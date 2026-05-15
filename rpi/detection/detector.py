@@ -15,6 +15,7 @@ from collections.abc import Callable
 from core.config import Config
 from core.types import Detection, ObjectClass
 from detection.distance_fusion import fuse_distance
+from detection.frame_buffer import FrameBuffer
 from detection.yolo_model import YoloDetector, YoloPrediction
 from sensors import CameraSensor, LidarSensor, UltrasonicSensor
 from utils.converters import now_utc
@@ -35,6 +36,7 @@ class DetectionLoop:
         down_ultrasonic: UltrasonicSensor | None = None,
         on_detections: DetectionCallback | None = None,
         fps: int | None = None,
+        frame_buffer: FrameBuffer | None = None,
     ) -> None:
         self._camera = camera
         self._yolo = yolo
@@ -50,6 +52,7 @@ class DetectionLoop:
         self._last_inference_ms = 0
         self._frames_processed = 0
         self._start_time = 0.0
+        self._frame_buffer = frame_buffer
 
     def set_callback(self, callback: DetectionCallback) -> None:
         """Register the listener invoked once per processed frame."""
@@ -101,6 +104,9 @@ class DetectionLoop:
             return
 
         frame = reading.data["frame"]
+        if self._frame_buffer is not None:
+            self._frame_buffer.update(frame, time.time())
+
         inference_start = time.monotonic()
         predictions = self._yolo.predict(frame)
         self._last_inference_ms = int((time.monotonic() - inference_start) * 1000)
