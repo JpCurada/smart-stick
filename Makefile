@@ -145,8 +145,7 @@ rpi-restart:
 # ============================================================
 #  ON-DEVICE TARGETS  (run these directly on the Pi)
 #
-#  Use these when SSH'd into the Pi inside the repo root.
-#  Assumes a Python venv at ./rpi/.venv (created during install).
+#  Run from the repo root on the Pi. Uses the root venv ($(VENV)).
 # ============================================================
 
 .PHONY: pi-check-cam pi-fetch-model pi-serve pi-health
@@ -154,16 +153,16 @@ rpi-restart:
 # Verify OpenCV can grab a frame from the default camera (override INDEX=1, etc.)
 INDEX ?= 0
 pi-check-cam:
-	cd $(RPI_DIR_LOCAL) && .venv/bin/python -c "import cv2; c=cv2.VideoCapture($(INDEX)); ok,f=c.read(); print('OK' if ok else 'FAIL', None if f is None else f.shape); c.release()"
+	cd $(RPI_DIR_LOCAL) && $(abspath $(PY)) -c "import cv2; c=cv2.VideoCapture($(INDEX)); ok,f=c.read(); print('OK' if ok else 'FAIL', None if f is None else f.shape); c.release()"
 
 # Pre-download the YOLO weights so the first inference call doesn't block.
 pi-fetch-model:
-	cd $(RPI_DIR_LOCAL) && .venv/bin/python -c "from ultralytics import YOLO; YOLO('yolov8n.pt')"
+	cd $(RPI_DIR_LOCAL) && $(abspath $(PY)) -c "from ultralytics import YOLO; YOLO('yolov8n.pt')"
 	@echo "yolov8n.pt cached"
 
 # Start the backend in the foreground on the Pi (Ctrl+C to stop).
 pi-serve:
-	cd $(RPI_DIR_LOCAL) && .venv/bin/uvicorn api.app:create_app --factory \
+	cd $(RPI_DIR_LOCAL) && $(abspath $(VENV))/bin/uvicorn api.app:create_app --factory \
 	  --host 0.0.0.0 --port $(RPI_PORT) --log-level info
 
 # Hit the local health endpoint to confirm the server is up.
