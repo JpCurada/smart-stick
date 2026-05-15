@@ -50,12 +50,18 @@ help:
 	@echo "    make rpi-mock        Start backend with fake sensor data"
 	@echo "    make phone-dev       Start Expo dev server"
 	@echo ""
-	@echo "  REAL RPi WORKFLOW"
+	@echo "  REAL RPi WORKFLOW  (run from laptop, talks to Pi via SSH)"
 	@echo "    make rpi-deploy      rsync rpi/ to the Pi over SSH"
 	@echo "    make rpi-real        Deploy + start uvicorn on the Pi"
 	@echo "    make rpi-logs        Tail systemd service log on Pi"
 	@echo "    make rpi-stop        Stop systemd service on Pi"
 	@echo "    make rpi-restart     Restart systemd service on Pi"
+	@echo ""
+	@echo "  ON-DEVICE TARGETS  (run from inside the Pi, repo root)"
+	@echo "    make pi-check-cam    Test OpenCV can grab a frame (INDEX=0)"
+	@echo "    make pi-fetch-model  Pre-download yolov8n.pt"
+	@echo "    make pi-serve        Start the backend in the foreground"
+	@echo "    make pi-health       Curl the local health endpoint"
 	@echo ""
 	@echo "  DEVELOPMENT"
 	@echo "    make test            Run pytest (no hardware)"
@@ -135,6 +141,34 @@ rpi-stop:
 
 rpi-restart:
 	ssh $(RPI_USER)@$(RPI_HOST) "sudo systemctl restart smartstick"
+
+# ============================================================
+#  ON-DEVICE TARGETS  (run these directly on the Pi)
+#
+#  Use these when SSH'd into the Pi inside the repo root.
+#  Assumes a Python venv at ./rpi/.venv (created during install).
+# ============================================================
+
+.PHONY: pi-check-cam pi-fetch-model pi-serve pi-health
+
+# Verify OpenCV can grab a frame from the default camera (override INDEX=1, etc.)
+INDEX ?= 0
+pi-check-cam:
+	cd $(RPI_DIR_LOCAL) && .venv/bin/python -c "import cv2; c=cv2.VideoCapture($(INDEX)); ok,f=c.read(); print('OK' if ok else 'FAIL', None if f is None else f.shape); c.release()"
+
+# Pre-download the YOLO weights so the first inference call doesn't block.
+pi-fetch-model:
+	cd $(RPI_DIR_LOCAL) && .venv/bin/python -c "from ultralytics import YOLO; YOLO('yolov8n.pt')"
+	@echo "yolov8n.pt cached"
+
+# Start the backend in the foreground on the Pi (Ctrl+C to stop).
+pi-serve:
+	cd $(RPI_DIR_LOCAL) && .venv/bin/uvicorn api.app:create_app --factory \
+	  --host 0.0.0.0 --port $(RPI_PORT) --log-level info
+
+# Hit the local health endpoint to confirm the server is up.
+pi-health:
+	curl -s http://127.0.0.1:$(RPI_PORT)/api/health
 
 # ============================================================
 #  MOBILE APP
