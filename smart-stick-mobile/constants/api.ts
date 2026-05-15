@@ -1,14 +1,14 @@
 /**
  * API configuration.
  *
- * The Pi's FastAPI service is reached over mDNS at `raspberrypi.local`.
- * Raspberry Pi OS broadcasts that hostname by default; iOS and most modern
- * Androids resolve it without any extra setup. As long as the phone and the
- * Pi are on the same WiFi, no IP configuration is needed.
+ * Production: Pi broadcasts `raspberrypi.local` via mDNS — works on the same WiFi, no config.
  *
- * Override at build/run-time via the EXPO_PUBLIC_API_BASE_URL env var
- * (useful when the Pi's hostname was changed via `raspi-config`, or when a
- * device doesn't support mDNS — fall back to the numeric IP).
+ * Development (Windows mock server):
+ *   1. Run `python mock/run.py` from the repo root — it prints your laptop IP.
+ *   2. In smart-stick-mobile/.env.local set:
+ *        EXPO_PUBLIC_API_BASE_URL=http://<laptop-ip>:5000
+ *   3. Phone and laptop must be on the same WiFi.
+ *   Current value in .env.local: http://192.168.1.9:5000
  */
 import Constants from 'expo-constants';
 

@@ -219,6 +219,12 @@ __marimo__/
 
 # Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 
+# Smart Stick — runtime data artifacts (regenerated on every run)
+rpi/data/smartstick.db
+rpi/data/smartstick.db-wal
+rpi/data/smartstick.db-shm
+rpi/data/electrical_parameters.csv
+
 # dependencies
 node_modules/
 

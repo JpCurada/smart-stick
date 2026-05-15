@@ -1,18 +1,16 @@
 /**
  * Tab 2: LOCATION — real-time GPS map.
  *
- * Polls /api/location every 5 s. The map view is rendered with
- * react-native-maps when available; until that native module is installed,
- * we display the coordinates and accuracy textually so the app still works
- * inside Expo Go for development.
+ * Polls /api/location every 5 s and renders an OpenStreetMap view via
+ * Leaflet inside a WebView (works in Expo Go, no native build needed).
  */
 import * as Linking from 'expo-linking';
-import { MapPin } from 'lucide-react-native';
 import { useCallback } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { InfoRow } from '@/components/info-row';
+import { LeafletMap } from '@/components/leaflet-map';
 import { StatusBadge } from '@/components/status-badge';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -45,24 +43,22 @@ export default function LocationScreen() {
           <StatusBadge online={online} label={online ? 'Live' : 'No fix'} />
         </View>
 
-        {/* Map placeholder — swap for <MapView /> once react-native-maps is wired. */}
-        <ThemedView style={styles.mapPlaceholder}>
-          {location.data ? (
-            <View style={styles.mapCoordRow}>
-              <MapPin size={20} color={Palette.primary} />
-              <ThemedText style={styles.mapPlaceholderText}>
-                {`${location.data.latitude.toFixed(5)}, ${location.data.longitude.toFixed(5)}`}
-              </ThemedText>
-            </View>
-          ) : (
-            <ThemedText style={styles.mapPlaceholderText}>Waiting for first GPS fix…</ThemedText>
-          )}
-          {location.data && (
+        {location.data ? (
+          <View style={styles.mapWrap}>
+            <LeafletMap
+              latitude={location.data.latitude}
+              longitude={location.data.longitude}
+              accuracyM={location.data.accuracy_m ?? null}
+            />
             <Pressable onPress={openInMaps} style={styles.openMapsBtn}>
               <ThemedText style={styles.openMapsLabel}>Open in Google Maps</ThemedText>
             </Pressable>
-          )}
-        </ThemedView>
+          </View>
+        ) : (
+          <ThemedView style={styles.mapPlaceholder}>
+            <ThemedText style={styles.mapPlaceholderText}>Waiting for first GPS fix…</ThemedText>
+          </ThemedView>
+        )}
 
         <ThemedView style={styles.card}>
           <ThemedText type="subtitle">Details</ThemedText>
@@ -114,6 +110,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  mapWrap: {
+    gap: 8,
+  },
   mapPlaceholder: {
     height: 280,
     borderRadius: 12,
@@ -121,15 +120,9 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(127,127,127,0.3)',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 16,
-  },
-  mapCoordRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
   },
   mapPlaceholderText: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
   },
   openMapsBtn: {
@@ -137,6 +130,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     backgroundColor: Palette.primary,
     borderRadius: 8,
+    alignItems: 'center',
   },
   openMapsLabel: {
     color: '#fff',

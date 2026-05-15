@@ -1,0 +1,11 @@
+# Minimal dependencies for running the mock server on Windows.
+# Install alongside rpi/requirements.txt but skip the hardware-only packages.
+#
+#   pip install -r rpi/requirements.txt --ignore-requires-python
+#   pip install -r mock/requirements.txt
+#
+# rpi/requirements.txt already pins fastapi, uvicorn, pydantic, psutil.
+# Only list anything extra here.
+
+# pyttsx3 on Windows uses SAPI5 (built-in) — no extra install needed.
+# opencv-python-headless is optional; the FakeCamera never calls cv2.
