@@ -130,23 +130,20 @@ def latest_frame(c: Container = Depends(_container)) -> Response:
 
 @router.get("/stream")
 def stream(c: Container = Depends(_container)) -> StreamingResponse:
-    import time
-
     boundary = "frame"
 
     def generator():
         last_ts = 0.0
-        target_interval = 1.0 / 15.0
         while True:
-            jpeg, ts = c.frame_buffer.latest()
-            if jpeg is not None and ts != last_ts:
-                last_ts = ts
-                yield (
-                    b"--" + boundary.encode() + b"\r\n"
-                    b"Content-Type: image/jpeg\r\n"
-                    b"Content-Length: " + str(len(jpeg)).encode() + b"\r\n\r\n" + jpeg + b"\r\n"
-                )
-            time.sleep(target_interval)
+            jpeg, ts = c.frame_buffer.wait_for_new(last_ts, timeout_s=1.0)
+            if jpeg is None or ts == last_ts:
+                continue
+            last_ts = ts
+            yield (
+                b"--" + boundary.encode() + b"\r\n"
+                b"Content-Type: image/jpeg\r\n"
+                b"Content-Length: " + str(len(jpeg)).encode() + b"\r\n\r\n" + jpeg + b"\r\n"
+            )
 
     return StreamingResponse(
         generator(),

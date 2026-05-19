@@ -27,7 +27,7 @@ class FrameBuffer:
     def __init__(self, jpeg_quality: int = 70) -> None:
         self._jpeg: bytes | None = None
         self._timestamp: float = 0.0
-        self._lock = threading.Lock()
+        self._condition = threading.Condition()
         self._quality = jpeg_quality
         self._log = get_logger("detection.frame_buffer")
 
@@ -43,10 +43,20 @@ class FrameBuffer:
         except Exception as exc:
             self._log.debug("jpeg encode failed: %s", exc)
             return
-        with self._lock:
+        with self._condition:
             self._jpeg = jpeg_bytes
             self._timestamp = timestamp
+            self._condition.notify_all()
 
     def latest(self) -> tuple[bytes | None, float]:
-        with self._lock:
+        with self._condition:
+            return self._jpeg, self._timestamp
+
+    def wait_for_new(
+        self, last_timestamp: float, timeout_s: float = 1.0
+    ) -> tuple[bytes | None, float]:
+        """Block until a frame newer than `last_timestamp` is available."""
+        with self._condition:
+            if self._timestamp <= last_timestamp:
+                self._condition.wait(timeout=timeout_s)
             return self._jpeg, self._timestamp

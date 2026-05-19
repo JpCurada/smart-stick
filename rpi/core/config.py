@@ -61,11 +61,11 @@ class Config:
     DETECTION_ENABLED: Final[bool] = _env_bool("DETECTION_ENABLED", True)
     YOLO_MODEL_PATH: Final[str] = _env_str("YOLO_MODEL_PATH", "yolov8n.pt")
     YOLO_CONFIDENCE_THRESHOLD: Final[float] = _env_float("YOLO_CONFIDENCE_THRESHOLD", 0.45)
-    YOLO_IMG_SIZE: Final[int] = _env_int("YOLO_IMG_SIZE", 640)
+    YOLO_IMG_SIZE: Final[int] = _env_int("YOLO_IMG_SIZE", 320)
 
     CAMERA_DEVICE: Final[str] = _env_str("CAMERA_DEVICE", "/dev/video0")
-    CAMERA_WIDTH: Final[int] = _env_int("CAMERA_WIDTH", 640)
-    CAMERA_HEIGHT: Final[int] = _env_int("CAMERA_HEIGHT", 480)
+    CAMERA_WIDTH: Final[int] = _env_int("CAMERA_WIDTH", 320)
+    CAMERA_HEIGHT: Final[int] = _env_int("CAMERA_HEIGHT", 240)
 
     GPS_PORT: Final[str] = _env_str("GPS_PORT", "/dev/ttyUSB0")
     GPS_BAUDRATE: Final[int] = _env_int("GPS_BAUDRATE", 9600)
