@@ -12,6 +12,7 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.jpcurada.smartstick",
       "adaptiveIcon": {
         "backgroundColor": "#fdf2fc",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -34,11 +35,19 @@
             "backgroundColor": "#000000"
           }
         }
-      ]
+      ],
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "c6605ed2-fbf7-43e8-926a-c713e7344594"
+      }
+    },
+    "owner": "jpcurada"
   }
 }
