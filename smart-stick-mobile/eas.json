@@ -9,7 +9,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "http://raspberrypi.local:5050"
+        "EXPO_PUBLIC_API_BASE_URL": "http://smart-stick-ai-device.local:5050"
       }
     },
     "production": {
@@ -17,7 +17,7 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "http://raspberrypi.local:5050"
+        "EXPO_PUBLIC_API_BASE_URL": "http://smart-stick-ai-device.local:5050"
       }
     }
   },
