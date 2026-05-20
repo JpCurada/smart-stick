@@ -1,0 +1,43 @@
+name: Build Android APK
+
+# Triggered manually from the Actions tab, or by pushing a v* tag.
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    name: EAS Build (Android, preview APK)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: smart-stick-mobile
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: smart-stick-mobile/package-lock.json
+
+      - name: Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      # Cloud build on Expo's servers. --wait blocks until the APK is ready;
+      # the download URL is printed at the end of this step's log.
+      # The API base URL is baked in via the `preview` profile in eas.json
+      # (EXPO_PUBLIC_API_BASE_URL=http://raspberrypi.local:5050).
+      - name: Build APK
+        run: eas build --platform android --profile preview --non-interactive --wait
