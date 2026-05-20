@@ -1,15 +1,91 @@
 name: Build Android APK
 
-# Triggered manually from the Actions tab, or by pushing a v* tag.
+# Manual trigger with a mode selector, or auto-trigger on v* tag pushes.
+#
+#   mode=apk-only   -> build APK, upload as workflow artifact. No tag, no Release.
+#   mode=patch      -> bump v0.1.3 -> v0.1.4, tag, push, build, publish Release.
+#   mode=minor      -> bump v0.1.3 -> v0.2.0, tag, push, build, publish Release.
+#   mode=major      -> bump v0.1.3 -> v1.0.0, tag, push, build, publish Release.
+#
+# Pushing a tag by hand (e.g. `git push origin v1.0.0`) skips the bump step
+# and goes straight to build + Release. Useful if you want to pick the version.
 on:
   workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Build mode'
+        required: true
+        default: 'apk-only'
+        type: choice
+        options:
+          - apk-only
+          - patch
+          - minor
+          - major
   push:
     tags:
       - 'v*'
 
+permissions:
+  # Required so we can push tags AND publish Releases.
+  contents: write
+
 jobs:
+  # ------------------------------------------------------------------
+  # Step 1 (dispatch only): compute the next version, create + push tag.
+  # ------------------------------------------------------------------
+  tag:
+    name: Bump version and tag
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.mode != 'apk-only'
+    runs-on: ubuntu-latest
+    outputs:
+      new_tag: ${{ steps.bump.outputs.new_tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # need full history so we can see existing tags
+
+      - name: Compute next version
+        id: bump
+        run: |
+          set -e
+          LATEST=$(git tag --list 'v*' --sort=-v:refname | head -n1)
+          if [ -z "$LATEST" ]; then
+            LATEST="v0.0.0"
+          fi
+          echo "Latest tag: $LATEST"
+          VERSION=${LATEST#v}
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+          case "${{ github.event.inputs.mode }}" in
+            patch) PATCH=$((PATCH + 1));;
+            minor) MINOR=$((MINOR + 1)); PATCH=0;;
+            major) MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0;;
+          esac
+          NEW_TAG="v${MAJOR}.${MINOR}.${PATCH}"
+          echo "New tag: $NEW_TAG"
+          echo "new_tag=$NEW_TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Push tag
+        env:
+          NEW_TAG: ${{ steps.bump.outputs.new_tag }}
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag "$NEW_TAG"
+          git push origin "$NEW_TAG"
+
+  # ------------------------------------------------------------------
+  # Step 2: build the APK. Always runs (apk-only, tag push, or after bump).
+  # ------------------------------------------------------------------
   build:
     name: EAS Build (Android, preview APK)
+    needs: [tag]
+    # The `tag` job is skipped for apk-only and for tag pushes, so we need
+    # `always()` to bypass GitHub's default "skip if any dep was skipped".
+    if: |
+      always() &&
+      (needs.tag.result == 'success' || needs.tag.result == 'skipped')
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -18,6 +94,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # If we just pushed a tag in the previous job, check that ref out
+          # so the build matches the tagged commit exactly.
+          ref: ${{ needs.tag.outputs.new_tag || github.ref }}
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -35,9 +115,35 @@ jobs:
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
 
-      # Cloud build on Expo's servers. --wait blocks until the APK is ready;
-      # the download URL is printed at the end of this step's log.
-      # The API base URL is baked in via the `preview` profile in eas.json
-      # (EXPO_PUBLIC_API_BASE_URL=http://raspberrypi.local:5050).
+      # Cloud build on Expo's servers. The API base URL is baked in via the
+      # `preview` profile in eas.json (EXPO_PUBLIC_API_BASE_URL=...).
       - name: Build APK
-        run: eas build --platform android --profile preview --non-interactive --wait
+        id: build
+        run: |
+          set -e
+          eas build --platform android --profile preview --non-interactive --wait --json > build.json
+          APK_URL=$(node -e "console.log(JSON.parse(require('fs').readFileSync('build.json'))[0].artifacts.buildUrl)")
+          echo "apk_url=$APK_URL" >> "$GITHUB_OUTPUT"
+          echo "Resolved APK URL: $APK_URL"
+
+      - name: Download APK
+        run: curl -L -o smart-stick.apk "${{ steps.build.outputs.apk_url }}"
+
+      # Always upload as a workflow artifact so apk-only runs still produce
+      # a downloadable APK (visible on the run summary page).
+      - name: Upload APK as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: smart-stick-apk
+          path: smart-stick-mobile/smart-stick.apk
+
+      # Publish a Release when:
+      #   - a v* tag was pushed by hand, OR
+      #   - the bump job created and pushed a v* tag for us.
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v') || needs.tag.outputs.new_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.tag.outputs.new_tag || github.ref_name }}
+          files: smart-stick-mobile/smart-stick.apk
+          generate_release_notes: true
