@@ -90,6 +90,12 @@ install-mobile:
 	cd $(MOBILE_DIR) && npm install --legacy-peer-deps
 	@echo "npm deps installed"
 
+# phone-dev no longer auto-installs: run `make install-mobile` once by hand.
+# Auto-reinstalling on every run kept corrupting a good node_modules tree
+# and the React 19 peer graph requires --legacy-peer-deps anyway.
+ensure-mobile:
+	@echo "(skipping auto-install; run 'make install-mobile' if node_modules is missing)"
+
 install: install-rpi install-mobile
 
 # ============================================================
@@ -162,6 +168,8 @@ pi-fetch-model:
 
 # Start the backend in the foreground on the Pi (Ctrl+C to stop).
 # `exec` replaces the shell so Ctrl+C goes straight to uvicorn instead of make.
+# This is also the entrypoint for the smartstick systemd unit at boot
+# (see rpi/systemd/smartstick.service): `make pi-serve RPI_PORT=5050`.
 pi-serve:
 	cd $(RPI_DIR_LOCAL) && exec $(abspath $(VENV))/bin/uvicorn api.app:create_app --factory \
 	  --host 0.0.0.0 --port $(RPI_PORT) --log-level info
@@ -174,15 +182,15 @@ pi-health:
 #  MOBILE APP
 # ============================================================
 
-.PHONY: phone-dev phone-android phone-ios
+.PHONY: phone-dev phone-android phone-ios ensure-mobile
 
-phone-dev: install-mobile
+phone-dev: ensure-mobile
 	cd $(MOBILE_DIR) && npx expo start
 
-phone-android: install-mobile
+phone-android: ensure-mobile
 	cd $(MOBILE_DIR) && npx expo start --android
 
-phone-ios: install-mobile
+phone-ios: ensure-mobile
 	cd $(MOBILE_DIR) && npx expo start --ios
 
 # ============================================================

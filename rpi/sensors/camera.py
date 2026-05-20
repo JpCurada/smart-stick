@@ -8,6 +8,7 @@ system still runs (tests, dev laptop).
 
 from __future__ import annotations
 
+import time
 from typing import Any
 
 from core.config import Config
@@ -45,19 +46,38 @@ class CameraSensor(SensorBase):
         self._width = width if width is not None else Config.CAMERA_WIDTH
         self._height = height if height is not None else Config.CAMERA_HEIGHT
         self._picam: Any = None
+        self._next_retry_at = 0.0
+        self._RETRY_BACKOFF_S = 5.0
 
     def _initialize_impl(self) -> None:
         if not _PICAMERA2_AVAILABLE:
             self._require(False, "Picamera2 is not installed")
+
+        # Back off between attempts so a held camera doesn't trigger a
+        # 6 Hz retry storm that leaks file descriptors until ENFILE.
+        now = time.monotonic()
+        if now < self._next_retry_at:
+            self._require(False, "Picamera2 retry backoff")
+        self._next_retry_at = now + self._RETRY_BACKOFF_S
+
+        picam = None
         try:
-            self._picam = Picamera2()
-            config = self._picam.create_video_configuration(
+            picam = Picamera2()
+            config = picam.create_video_configuration(
                 main={"size": (self._width, self._height), "format": "RGB888"}
             )
-            self._picam.configure(config)
-            self._picam.start()
+            picam.configure(config)
+            picam.start()
+            self._picam = picam
             self._log.info("camera using Picamera2 (CSI) %dx%d", self._width, self._height)
         except Exception as exc:
+            # Release any descriptors the partially-built Picamera2 grabbed.
+            if picam is not None:
+                try:
+                    picam.close()
+                except Exception:
+                    pass
+            self._picam = None
             self._require(False, f"Picamera2 init failed: {exc}")
 
     def _read_impl(self) -> dict[str, Any]:

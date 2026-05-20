@@ -7,9 +7,14 @@ Wants=network-online.target
 Type=simple
 User=pi
 Group=pi
-WorkingDirectory=/home/pi/smart-stick/rpi
+# Repo root — `make pi-serve` is a top-level target and uses the root .venv
+WorkingDirectory=/home/pi/smart-stick
 EnvironmentFile=/home/pi/smart-stick/rpi/.env
-ExecStart=/home/pi/smart-stick/rpi/.venv/bin/python main.py
+# Equivalent of:
+#   cd smart-stick && source .venv/bin/activate && make pi-serve RPI_PORT=5050
+# pi-serve already `exec`s the root .venv/bin/uvicorn, so no manual activate
+# is needed — the absolute venv path makes the venv explicit.
+ExecStart=/usr/bin/make pi-serve RPI_PORT=5050
 Restart=on-failure
 RestartSec=5
 StandardOutput=journal
@@ -19,7 +24,7 @@ StandardError=journal
 NoNewPrivileges=true
 ProtectSystem=full
 ProtectHome=read-only
-ReadWritePaths=/home/pi/data /home/pi/smart-stick/rpi
+ReadWritePaths=/home/pi/data /home/pi/smart-stick
 
 [Install]
 WantedBy=multi-user.target
