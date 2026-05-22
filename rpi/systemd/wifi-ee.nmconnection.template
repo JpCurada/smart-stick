@@ -1,0 +1,32 @@
+; NetworkManager connection profile for the "EE Wi-Fi" network.
+; Drop the rendered .nmconnection file into /etc/NetworkManager/system-connections/
+; on the Pi (NOT this repo) — see wifi-ee.README.md for the install command.
+;
+; The real .nmconnection contains the WiFi password in plain text, which is why
+; this repo only ships a template with __PSK__ as a placeholder.
+
+[connection]
+id=EE Wi-Fi
+type=wifi
+interface-name=wlan0
+autoconnect=true
+; Higher number wins when multiple saved networks are in range. Bumping this
+; above the default (0) makes EE Wi-Fi the preferred network at boot.
+autoconnect-priority=100
+
+[wifi]
+mode=infrastructure
+ssid=EE Wi-Fi
+
+[wifi-security]
+key-mgmt=wpa-psk
+psk=__PSK__
+
+[ipv4]
+method=auto
+
+[ipv6]
+addr-gen-mode=default
+method=auto
+
+[proxy]

@@ -12,6 +12,7 @@ ultralytics==8.3.40
 pyserial==3.5
 smbus2==0.4.3
 RPi.GPIO==0.7.1; sys_platform == "linux"
+spidev==3.6; sys_platform == "linux"
 
 # --- Audio / TTS ---
 pyttsx3==2.98

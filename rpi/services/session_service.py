@@ -40,7 +40,9 @@ class SessionService:
             end_time = now_utc()
             duration = int((end_time - self._start_time).total_seconds() / 60)
             self._persist(end_time=end_time, duration_minutes=duration)
-            summary = self.snapshot()
+            # Build the summary while the lock is already held — calling the
+            # public snapshot() here would re-acquire self._lock and deadlock.
+            summary = self._snapshot_locked()
             self._session_id = None
             self._start_time = None
             return summary
@@ -62,17 +64,21 @@ class SessionService:
 
     def snapshot(self) -> dict:
         with self._lock:
-            duration_min: int | None = None
-            if self._start_time is not None:
-                duration_min = int((now_utc() - self._start_time).total_seconds() / 60)
-            return {
-                "session_id": self._session_id,
-                "start_time": self._start_time.isoformat() if self._start_time else None,
-                "duration_minutes": duration_min,
-                "distance_km": round(self._distance_km, 3),
-                "detection_count": self._detection_count,
-                "alert_count": self._alert_count,
-            }
+            return self._snapshot_locked()
+
+    def _snapshot_locked(self) -> dict:
+        """Build the session summary. Caller must already hold self._lock."""
+        duration_min: int | None = None
+        if self._start_time is not None:
+            duration_min = int((now_utc() - self._start_time).total_seconds() / 60)
+        return {
+            "session_id": self._session_id,
+            "start_time": self._start_time.isoformat() if self._start_time else None,
+            "duration_minutes": duration_min,
+            "distance_km": round(self._distance_km, 3),
+            "detection_count": self._detection_count,
+            "alert_count": self._alert_count,
+        }
 
     def _persist(self, end_time, duration_minutes: int | None = None) -> None:
         if self._session_id is None or self._start_time is None:

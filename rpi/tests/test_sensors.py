@@ -13,6 +13,7 @@ from sensors.battery import (
     classify_health,
     voltage_to_percentage,
 )
+from sensors.esp32_spi import build_command, parse_telemetry
 from sensors.gps import parse_gpgga
 
 
@@ -110,3 +111,63 @@ class TestGpsParsing:
 
     def test_parse_non_gpgga_returns_none(self) -> None:
         assert parse_gpgga("$GPRMC,123519,A,1435.97,N,12059.05,E,*47") is None
+
+
+def _telemetry_frame(
+    lat: float = 0.0,
+    lng: float = 0.0,
+    lidar_cm: int = -1,
+    sos: int = 0,
+    drop: int = 0,
+    overhead: int = 0,
+    gps_valid: int = 0,
+    seq: int = 0,
+) -> bytes:
+    """Build a 64-byte SPI frame matching the firmware's esp_to_rpi_t."""
+    import struct
+
+    packet = struct.pack("<ffhBBBBB", lat, lng, lidar_cm, sos, drop, overhead, gps_valid, seq)
+    return packet + bytes(64 - len(packet))
+
+
+class TestEspSpiTelemetry:
+    def test_parse_valid_frame(self) -> None:
+        frame = _telemetry_frame(
+            lat=14.5995, lng=120.9842, lidar_cm=85, drop=1, gps_valid=1, seq=42
+        )
+        result = parse_telemetry(frame)
+        assert result is not None
+        assert round(result["latitude"], 4) == 14.5995
+        assert round(result["longitude"], 4) == 120.9842
+        assert result["lidar_distance_m"] == 0.85
+        assert result["sos_active"] is False
+        assert result["drop_detected"] is True
+        assert result["overhead_detected"] is False
+        assert result["gps_valid"] is True
+        assert result["seq"] == 42
+
+    def test_lidar_negative_means_no_reading(self) -> None:
+        # lidar_cm = -1 packs as 0xFFFF, so this is a valid (non-empty)
+        # frame reporting "no LiDAR reading".
+        result = parse_telemetry(_telemetry_frame(lidar_cm=-1, seq=3))
+        assert result is not None
+        assert result["lidar_distance_m"] is None
+
+    def test_all_zero_frame_returns_none(self) -> None:
+        # A literally all-zero packet (lidar_cm=0, every field 0) means the
+        # ESP32 has not loaded telemetry yet.
+        assert parse_telemetry(_telemetry_frame(lidar_cm=0)) is None
+
+    def test_short_frame_returns_none(self) -> None:
+        assert parse_telemetry(b"\x01\x02\x03") is None
+
+    def test_build_command_is_64_bytes(self) -> None:
+        cmd = build_command(buzzer_cmd=3, vibrator_cmd=1)
+        assert len(cmd) == 64
+        assert cmd[0] == 3
+        assert cmd[1] == 1
+        assert cmd[2] == 0 and cmd[3] == 0
+
+    def test_build_command_default_is_all_zero(self) -> None:
+        # The all-zero frame is the firmware-ignored "no override" command.
+        assert build_command() == bytes(64)

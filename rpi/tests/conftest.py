@@ -67,21 +67,24 @@ def mock_camera() -> MagicMock:
 
 
 @pytest.fixture
-def mock_gps() -> MagicMock:
+def mock_telemetry() -> MagicMock:
+    """ESP32 telemetry sensor returning one valid frame with a GPS fix."""
     reading = MagicMock()
     reading.healthy = True
     reading.data = {
         "latitude": 14.5995,
         "longitude": 120.9842,
-        "altitude": 12.0,
-        "accuracy_m": 5.0,
-        "speed": 1.0,
-        "fix_quality": 1,
+        "lidar_distance_m": 0.85,
+        "sos_active": False,
+        "drop_detected": False,
+        "overhead_detected": False,
+        "gps_valid": True,
+        "seq": 1,
     }
     from utils.converters import now_utc
 
     reading.timestamp = now_utc()
 
-    gps = MagicMock()
-    gps.read.return_value = reading
-    return gps
+    telemetry = MagicMock()
+    telemetry.read.return_value = reading
+    return telemetry

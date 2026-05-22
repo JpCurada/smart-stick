@@ -87,8 +87,23 @@ class Config:
     BATTERY_WARN_25: Final[bool] = _env_bool("BATTERY_WARN_25", True)
     BATTERY_WARN_10: Final[bool] = _env_bool("BATTERY_WARN_10", True)
 
-    ESP32_PORT: Final[str] = _env_str("ESP32_PORT", "/dev/serial0")
-    ESP32_BAUDRATE: Final[int] = _env_int("ESP32_BAUDRATE", 115200)
+    # ── ESP32 SPI sensor hub ────────────────────────────────────────────
+    # The ESP32 is an SPI slave; the RPi is the master. Each transfer is a
+    # fixed 64-byte full-duplex frame: the ESP32 returns a 15-byte
+    # esp_to_rpi_t telemetry packet, the RPi sends a 4-byte rpi_to_esp_t
+    # command packet (both zero-padded to 64 bytes).
+    ESP32_SPI_BUS: Final[int] = _env_int("ESP32_SPI_BUS", 0)
+    ESP32_SPI_DEVICE: Final[int] = _env_int("ESP32_SPI_DEVICE", 0)
+    ESP32_SPI_SPEED_HZ: Final[int] = _env_int("ESP32_SPI_SPEED_HZ", 1_000_000)
+    ESP32_SPI_MODE: Final[int] = _env_int("ESP32_SPI_MODE", 0)
+    # GPIO (BCM) wired to the ESP32 IRQ line; LOW = fresh telemetry ready.
+    ESP32_IRQ_PIN: Final[int] = _env_int("ESP32_IRQ_PIN", 23)
+    # A telemetry frame older than this is treated as stale (read unhealthy).
+    ESP32_FRAME_TIMEOUT_S: Final[float] = _env_float("ESP32_FRAME_TIMEOUT_S", 1.0)
+    # Synthetic-detection distances used when the firmware reports a
+    # drop / overhead flag (the firmware owns the threshold logic, not us).
+    ESP32_DROP_DETECTION_M: Final[float] = _env_float("ESP32_DROP_DETECTION_M", 0.25)
+    ESP32_OVERHEAD_DETECTION_M: Final[float] = _env_float("ESP32_OVERHEAD_DETECTION_M", 0.5)
 
     HAPTICS_PIN: Final[int] = _env_int("HAPTICS_PIN", 26)
     BUZZER_PIN: Final[int] = _env_int("BUZZER_PIN", 27)

@@ -1,9 +1,12 @@
 """Detection loop orchestration.
 
 Reads camera frames, asks the YOLO model for predictions, fuses distance
-information from LIDAR / ultrasonic, and emits high-level Detection
-objects through a callback. The detector deliberately knows nothing about
-storage, output, or the API — those concerns live in services.
+information from the ESP32 telemetry stream (LiDAR), and emits high-level
+Detection objects through a callback. Drop (stairs/curb) and overhead
+obstacle detections come straight from the firmware's confirmed flags —
+the ESP32 owns that decision logic. The detector deliberately knows
+nothing about storage, output, or the API — those concerns live in
+services.
 """
 
 from __future__ import annotations
@@ -17,7 +20,7 @@ from core.types import Detection, ObjectClass
 from detection.distance_fusion import fuse_distance
 from detection.frame_buffer import FrameBuffer
 from detection.yolo_model import YoloDetector, YoloPrediction
-from sensors import CameraSensor, LidarSensor, UltrasonicSensor
+from sensors import CameraSensor, StickTelemetrySensor
 from utils.converters import now_utc
 from utils.logger import get_logger
 
@@ -31,18 +34,14 @@ class DetectionLoop:
         self,
         camera: CameraSensor,
         yolo: YoloDetector,
-        lidar: LidarSensor | None = None,
-        overhead_ultrasonic: UltrasonicSensor | None = None,
-        down_ultrasonic: UltrasonicSensor | None = None,
+        telemetry: StickTelemetrySensor | None = None,
         on_detections: DetectionCallback | None = None,
         fps: int | None = None,
         frame_buffer: FrameBuffer | None = None,
     ) -> None:
         self._camera = camera
         self._yolo = yolo
-        self._lidar = lidar
-        self._overhead = overhead_ultrasonic
-        self._down = down_ultrasonic
+        self._telemetry = telemetry
         self._on_detections = on_detections
         self._fps = fps if fps is not None else Config.DETECTION_FPS
         self._period_s = 1.0 / max(1, self._fps)
@@ -63,12 +62,8 @@ class DetectionLoop:
             return
         self._camera.initialize()
         self._yolo.load()
-        if self._lidar is not None:
-            self._lidar.initialize()
-        if self._overhead is not None:
-            self._overhead.initialize()
-        if self._down is not None:
-            self._down.initialize()
+        if self._telemetry is not None:
+            self._telemetry.initialize()
 
         self._stop_flag.clear()
         self._start_time = time.monotonic()
@@ -110,20 +105,23 @@ class DetectionLoop:
         self._last_inference_ms = int((time.monotonic() - inference_start) * 1000)
         self._frames_processed += 1
 
-        lidar_distance = self._read_lidar_distance()
+        telemetry = self._read_telemetry()
+        lidar_distance = telemetry.get("lidar_distance_m") if telemetry else None
         detections = [self._build_detection(p, lidar_distance) for p in predictions]
 
-        if self._overhead is not None:
-            overhead_distance = self._read_ultrasonic_distance(self._overhead)
-            if overhead_distance is not None and overhead_distance < 0.5:
+        # Drop / overhead are firmware-confirmed flags — trust them directly
+        # instead of re-thresholding raw distances on the RPi.
+        if telemetry is not None:
+            if telemetry.get("overhead_detected"):
                 detections.append(
-                    self._synthetic_detection(ObjectClass.OVERHEAD, overhead_distance)
+                    self._synthetic_detection(
+                        ObjectClass.OVERHEAD, Config.ESP32_OVERHEAD_DETECTION_M
+                    )
                 )
-
-        if self._down is not None:
-            down_distance = self._read_ultrasonic_distance(self._down)
-            if down_distance is not None and down_distance < 0.3:
-                detections.append(self._synthetic_detection(ObjectClass.STAIRS, down_distance))
+            if telemetry.get("drop_detected"):
+                detections.append(
+                    self._synthetic_detection(ObjectClass.STAIRS, Config.ESP32_DROP_DETECTION_M)
+                )
 
         if self._frame_buffer is not None:
             annotated = self._annotate_frame(frame, predictions, detections)
@@ -197,19 +195,14 @@ class DetectionLoop:
             bbox=prediction.bbox,
         )
 
-    def _read_lidar_distance(self) -> float | None:
-        if self._lidar is None:
+    def _read_telemetry(self) -> dict[str, object] | None:
+        """Return the latest ESP32 telemetry frame, or None if unavailable."""
+        if self._telemetry is None:
             return None
-        reading = self._lidar.read()
+        reading = self._telemetry.read()
         if not reading.healthy:
             return None
-        return reading.data.get("distance_m")
-
-    def _read_ultrasonic_distance(self, sensor: UltrasonicSensor) -> float | None:
-        reading = sensor.read()
-        if not reading.healthy:
-            return None
-        return reading.data.get("distance_m")
+        return reading.data
 
     def _synthetic_detection(self, object_class: ObjectClass, distance_m: float) -> Detection:
         return Detection(

@@ -20,9 +20,8 @@ from sensors import (
     BatterySensor,
     CameraSensor,
     Esp32Bridge,
-    GpsSensor,
-    LidarSensor,
-    UltrasonicSensor,
+    Esp32SpiLink,
+    StickTelemetrySensor,
 )
 from services import (
     BatteryService,
@@ -55,6 +54,7 @@ class Container:
     database: Database
     output_queue: OutputQueue
     bridge: Esp32Bridge
+    spi_link: Esp32SpiLink
     detection_service: DetectionService
     location_service: LocationService
     battery_service: BatteryService
@@ -80,6 +80,7 @@ class Container:
         self.battery_service.stop()
         self.location_service.stop()
         self.output_queue.stop()
+        self.spi_link.close()
         self.database.close()
         log.info("background services stopped")
 
@@ -100,9 +101,16 @@ def build_container() -> Container:
     session_repo = SessionRepository(database)
     electrical_repo = ElectricalRepository(database)
 
+    # SPI link to the ESP32 sensor hub — shared by the telemetry sensor
+    # (reads) and the haptics / buzzer controllers (command overrides).
+    spi_link = Esp32SpiLink()
+    # UART bridge kept only for battery telemetry, which the firmware does
+    # not yet report over SPI; BatterySensor falls back to a simulated
+    # drain when the bridge is unavailable.
     bridge = Esp32Bridge()
-    haptics = HapticsController(bridge=bridge)
-    buzzer = BuzzerController(bridge=bridge)
+
+    haptics = HapticsController(link=spi_link)
+    buzzer = BuzzerController(link=spi_link)
     speaker = SpeakerController()
     output_queue = OutputQueue()
 
@@ -117,26 +125,18 @@ def build_container() -> Container:
     message_service = MessageService(output=output_service, repository=message_repo)
     session_service = SessionService(repository=session_repo)
 
+    # The ESP32 is the sensor hub: it owns the LiDAR, both ultrasonic
+    # sensors and the GPS, and returns a telemetry packet on every SPI
+    # transfer. One telemetry sensor feeds both detection and location.
+    telemetry = StickTelemetrySensor(link=spi_link)
+
     camera = CameraSensor()
     yolo = YoloDetector()
-    lidar = LidarSensor()
-    overhead = UltrasonicSensor(
-        name="ultrasonic_overhead",
-        trigger_pin=Config.ULTRASONIC_OVERHEAD_TRIG_PIN,
-        echo_pin=Config.ULTRASONIC_OVERHEAD_ECHO_PIN,
-    )
-    down = UltrasonicSensor(
-        name="ultrasonic_down",
-        trigger_pin=Config.ULTRASONIC_DOWN_TRIG_PIN,
-        echo_pin=Config.ULTRASONIC_DOWN_ECHO_PIN,
-    )
     frame_buffer = FrameBuffer()
     detection_loop = DetectionLoop(
         camera=camera,
         yolo=yolo,
-        lidar=lidar,
-        overhead_ultrasonic=overhead,
-        down_ultrasonic=down,
+        telemetry=telemetry,
         frame_buffer=frame_buffer,
     )
     detection_service = DetectionService(
@@ -147,8 +147,7 @@ def build_container() -> Container:
         alert_repo=alert_repo,
     )
 
-    gps = GpsSensor()
-    location_service = LocationService(gps=gps, repository=location_repo)
+    location_service = LocationService(telemetry=telemetry, repository=location_repo)
 
     battery_sensor = BatterySensor(bridge=bridge)
 
@@ -173,6 +172,7 @@ def build_container() -> Container:
         database=database,
         output_queue=output_queue,
         bridge=bridge,
+        spi_link=spi_link,
         detection_service=detection_service,
         location_service=location_service,
         battery_service=battery_service,

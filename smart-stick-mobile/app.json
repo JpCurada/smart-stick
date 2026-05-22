@@ -13,6 +13,7 @@
     },
     "android": {
       "package": "com.jpcurada.smartstick",
+      "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "backgroundColor": "#fdf2fc",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

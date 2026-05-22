@@ -1,4 +1,9 @@
-"""Reads GPS and persists locations on a fixed cadence."""
+"""Reads GPS from the ESP32 telemetry stream and persists locations.
+
+The ESP32 owns the GPS receiver; this service consumes the latitude /
+longitude carried in the telemetry frame rather than driving a GPS
+sensor directly.
+"""
 
 from __future__ import annotations
 
@@ -7,7 +12,7 @@ import time
 import uuid
 
 from core.config import Config
-from sensors import GpsSensor
+from sensors import StickTelemetrySensor
 from storage import LocationRecord, LocationRepository
 from storage.repositories import encode_json
 from utils.converters import unix_timestamp
@@ -16,15 +21,15 @@ from utils.logger import get_logger
 
 
 class LocationService:
-    """Polls the GPS sensor and records fixes to the database."""
+    """Polls ESP32 telemetry for GPS fixes and records them to the database."""
 
     def __init__(
         self,
-        gps: GpsSensor,
+        telemetry: StickTelemetrySensor,
         repository: LocationRepository,
         interval_s: int | None = None,
     ) -> None:
-        self._gps = gps
+        self._telemetry = telemetry
         self._repo = repository
         self._interval_s = interval_s if interval_s is not None else Config.GPS_UPDATE_INTERVAL_S
         self._stop_flag = threading.Event()
@@ -38,7 +43,7 @@ class LocationService:
     def start(self) -> None:
         if self._thread is not None and self._thread.is_alive():
             return
-        self._gps.initialize()
+        self._telemetry.initialize()
         self._stop_flag.clear()
         self._thread = threading.Thread(target=self._run, name="location", daemon=True)
         self._thread.start()
@@ -65,11 +70,18 @@ class LocationService:
             time.sleep(self._interval_s)
 
     def _poll_once(self) -> None:
-        reading = self._gps.read()
+        reading = self._telemetry.read()
         if not reading.healthy:
             return
-        payload = dict(reading.data)
-        payload["timestamp"] = reading.timestamp.isoformat()
+        # The frame carries lat/lng = 0.0 until a fix is acquired — skip
+        # those so we never persist a bogus null-island location.
+        if not reading.data.get("gps_valid"):
+            return
+        payload = {
+            "latitude": reading.data["latitude"],
+            "longitude": reading.data["longitude"],
+            "timestamp": reading.timestamp.isoformat(),
+        }
 
         with self._lock:
             self._latest = payload

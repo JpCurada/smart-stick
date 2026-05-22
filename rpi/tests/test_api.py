@@ -40,11 +40,13 @@ def _build_test_container(database):
 
     bridge = MagicMock()
     bridge.is_healthy.return_value = True
-    bridge.send_vibration.return_value = True
-    bridge.send_buzz.return_value = True
 
-    haptics = HapticsController(bridge=bridge)
-    buzzer = BuzzerController(bridge=bridge)
+    spi_link = MagicMock()
+    spi_link.send_command.return_value = True
+    spi_link.transfer.return_value = None
+
+    haptics = HapticsController(link=spi_link)
+    buzzer = BuzzerController(link=spi_link)
     speaker = SpeakerController()
     queue = OutputQueue()
     queue.start()
@@ -90,11 +92,13 @@ def _build_test_container(database):
     session_service = SessionService(repository=SessionRepository(database))
     message_service = MessageService(output=output_service, repository=message_repo)
     electrical_logger = MagicMock()
+    frame_buffer = MagicMock()
 
     return Container(
         database=database,
         output_queue=queue,
         bridge=bridge,
+        spi_link=spi_link,
         detection_service=detection_service,
         location_service=location_service,
         battery_service=battery_service,
@@ -102,6 +106,7 @@ def _build_test_container(database):
         message_service=message_service,
         session_service=session_service,
         electrical_logger=electrical_logger,
+        frame_buffer=frame_buffer,
     )
 
 

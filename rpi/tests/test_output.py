@@ -12,47 +12,61 @@ from output.output_queue import OutputCommand, OutputQueue
 
 
 class TestHapticsController:
-    def test_clamps_intensity(self, mock_bridge: MagicMock) -> None:
-        controller = HapticsController(bridge=mock_bridge)
-        controller.vibrate(intensity=999, duration_ms=100)
-        called_intensity = mock_bridge.send_vibration.call_args[0][0]
-        assert called_intensity == 255
+    def test_positive_intensity_turns_motor_on(self) -> None:
+        link = MagicMock()
+        link.send_command.return_value = True
+        controller = HapticsController(link=link)
+        controller.vibrate(intensity=200, duration_ms=100)
+        link.send_command.assert_called_once_with(buzzer_cmd=0, vibrator_cmd=1)
 
-    def test_negative_duration_is_clamped(self, mock_bridge: MagicMock) -> None:
-        controller = HapticsController(bridge=mock_bridge)
-        controller.vibrate(intensity=100, duration_ms=-50)
-        called_duration = mock_bridge.send_vibration.call_args[0][1]
-        assert called_duration == 0
+    def test_zero_intensity_turns_motor_off(self) -> None:
+        link = MagicMock()
+        link.send_command.return_value = True
+        controller = HapticsController(link=link)
+        controller.vibrate(intensity=0, duration_ms=100)
+        link.send_command.assert_called_once_with(buzzer_cmd=0, vibrator_cmd=0)
 
-    def test_runs_without_bridge(self) -> None:
-        controller = HapticsController(bridge=None)
+    def test_runs_without_link(self) -> None:
+        controller = HapticsController(link=None)
         assert controller.vibrate(100, 200) is True
 
-    def test_play_pattern_repeats_pulses(self, mock_bridge: MagicMock) -> None:
-        controller = HapticsController(bridge=mock_bridge)
+    def test_play_pattern_asserts_on_override(self) -> None:
+        link = MagicMock()
+        link.send_command.return_value = True
+        controller = HapticsController(link=link)
         pattern = VibrationPattern(
             name="triple", intensity=200, duration_ms=100, pulses=3, gap_ms=50
         )
         controller.play_pattern(pattern)
-        # 3 vibrate pulses + 3 gap calls.
-        assert mock_bridge.send_vibration.call_count == 6
+        link.send_command.assert_called_once_with(buzzer_cmd=0, vibrator_cmd=1)
 
 
 class TestBuzzerController:
-    def test_clamps_frequency(self, mock_bridge: MagicMock) -> None:
-        controller = BuzzerController(bridge=mock_bridge)
-        controller.buzz(frequency_hz=10_000, duration_ms=100)
-        called_freq = mock_bridge.send_buzz.call_args[0][0]
-        assert called_freq == 5000
+    def test_buzz_selects_drop_pattern(self) -> None:
+        link = MagicMock()
+        link.send_command.return_value = True
+        controller = BuzzerController(link=link)
+        controller.buzz(frequency_hz=1000, duration_ms=100)
+        link.send_command.assert_called_once_with(buzzer_cmd=1, vibrator_cmd=0)
 
-    def test_play_tone_repeats(self, mock_bridge: MagicMock) -> None:
-        controller = BuzzerController(bridge=mock_bridge)
+    def test_sos_tone_maps_to_sos_mode(self) -> None:
+        link = MagicMock()
+        link.send_command.return_value = True
+        controller = BuzzerController(link=link)
         tone = BuzzerTone(
-            name="sos", frequency_hz=2500, duration_ms=500, pattern_count=3, gap_ms=200
+            name="emergency_sos",
+            frequency_hz=2500,
+            duration_ms=500,
+            pattern_count=3,
+            gap_ms=200,
         )
         controller.play_tone(tone)
-        # 3 tone pulses + 3 gap calls.
-        assert mock_bridge.send_buzz.call_count == 6
+        link.send_command.assert_called_once_with(buzzer_cmd=3, vibrator_cmd=0)
+
+    def test_runs_without_link(self) -> None:
+        controller = BuzzerController(link=None)
+        tone = BuzzerTone(name="standard_alert", frequency_hz=1000, duration_ms=200)
+        assert controller.play_tone(tone) is True
 
 
 class TestOutputQueue:
