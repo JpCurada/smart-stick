@@ -190,6 +190,30 @@ def emergency_sos(c: Container = Depends(_container)) -> CommandAck:
     return CommandAck(success=True, command_id=command_id)
 
 
+# --------------------------- Find My Stick ----------------------------------- #
+
+
+@router.post("/find", response_model=CommandAck)
+def find_my_stick(c: Container = Depends(_container)) -> CommandAck:
+    """Make the cane buzz + vibrate so a sighted helper can locate it."""
+    import time as _time
+
+    start = _time.monotonic()
+    command_id = c.output_service.find_my_stick()
+    latency_ms = (_time.monotonic() - start) * 1000.0
+    c.metrics_service.record_find_my_stick(latency_ms=latency_ms, command="buzz+vibrate")
+    return CommandAck(success=True, command_id=command_id)
+
+
+# --------------------------- Metrics ----------------------------------------- #
+
+
+@router.get("/metrics")
+def metrics_snapshot(c: Container = Depends(_container)) -> dict[str, Any]:
+    """Return a per-metric rolling summary for the demo dashboard."""
+    return c.metrics_service.snapshot()
+
+
 # --------------------------- SOS test ---------------------------------------- #
 
 

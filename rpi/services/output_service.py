@@ -125,6 +125,24 @@ class OutputService:
     def emergency_sos(self) -> str:
         return self.play_tone(BUZZER_TONES["emergency_sos"])
 
+    def find_my_stick(self) -> str:
+        """Buzz + vibrate the cane so a sighted helper can locate it.
+
+        Issues the SPI override that turns the buzzer on (drop pattern) and
+        the vibrator on. The firmware drives both until the user dismisses
+        the SOS button or the override times out.
+        """
+        command_id = _command_id("cmd_find")
+        params = {"buzzer_cmd": 1, "vibrator_cmd": 1, "name": "find_my_stick"}
+
+        def action() -> None:
+            buzzer_ok = self._buzzer.play_tone(BUZZER_TONES["standard_alert"])
+            haptics_ok = self._haptics.vibrate(intensity=255, duration_ms=500)
+            self._record(command_id, "find_my_stick", params, buzzer_ok and haptics_ok)
+
+        self._queue.submit(OutputCommand(action=action, name="find_my_stick"))
+        return command_id
+
     def _record(
         self,
         command_id: str,

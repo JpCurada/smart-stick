@@ -98,6 +98,9 @@ def _build_test_container(database):
     sos_service.fire_test.return_value = {"published": True}
     sos_service.latest_event.return_value = None
 
+    metrics_service = MagicMock()
+    metrics_service.snapshot.return_value = {}
+
     return Container(
         database=database,
         output_queue=queue,
@@ -111,6 +114,7 @@ def _build_test_container(database):
         session_service=session_service,
         electrical_logger=electrical_logger,
         sos_service=sos_service,
+        metrics_service=metrics_service,
         frame_buffer=frame_buffer,
     )
 

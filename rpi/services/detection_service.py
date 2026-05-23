@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import threading
+import time
 import uuid
 
 from core.types import Detection
 from detection.alert_engine import AlertDecision, AlertEngine
 from detection.detector import DetectionLoop
+from services.metrics_service import MetricsService
 from services.output_service import OutputService
 from storage import (
     AlertRecord,
@@ -30,12 +32,14 @@ class DetectionService:
         output: OutputService,
         detection_repo: DetectionRepository,
         alert_repo: AlertRepository,
+        metrics: MetricsService | None = None,
     ) -> None:
         self._loop = loop
         self._engine = alert_engine
         self._output = output
         self._detection_repo = detection_repo
         self._alert_repo = alert_repo
+        self._metrics = metrics
         self._log = get_logger("services.detection")
         self._latest_detections: list[Detection] = []
         self._latest_alert: dict | None = None
@@ -69,10 +73,39 @@ class DetectionService:
             if decision.triggered:
                 triggered_any = True
                 self._dispatch(detection, decision)
+                self._record_recognition_metric(detection, meta)
 
+        self._record_detection_metric(detections, meta)
         self._persist_frame(detections, alert_triggered=triggered_any)
         with self._lock:
             self._latest_detections = list(detections)
+
+    def _record_recognition_metric(self, detection: Detection, meta: dict) -> None:
+        """YOLO recognized + classified one object. Log its inference time."""
+        if self._metrics is None or detection.bbox is None:
+            return  # synthetic detections (STAIRS / OVERHEAD) have no bbox
+        inference_ms = meta.get("inference_ms")
+        if inference_ms is None:
+            return
+        self._metrics.record_obstacle_recognition(
+            inference_ms=float(inference_ms),
+            object_class=detection.object_class.value,
+            distance_m=detection.distance_m,
+        )
+
+    def _record_detection_metric(self, detections: list[Detection], meta: dict) -> None:
+        """ESP32 confirmed a drop/overhead. Measure SPI→dispatch latency."""
+        if self._metrics is None:
+            return
+        sources: list[str] = meta.get("firmware_flag_sources") or []
+        if not sources:
+            return
+        telemetry_read_at = meta.get("telemetry_read_at")
+        if telemetry_read_at is None:
+            return
+        latency_ms = (time.monotonic() - telemetry_read_at) * 1000.0
+        for source in sources:
+            self._metrics.record_obstacle_detection(latency_ms=latency_ms, source=source)
 
     def _dispatch(self, detection: Detection, decision: AlertDecision) -> None:
         if decision.vibration is not None:

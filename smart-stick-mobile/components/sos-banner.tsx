@@ -24,13 +24,20 @@ export function SosBanner({ visible, location, triggeredAt, onDismiss }: Props) 
   if (!visible) return null;
 
   const time = triggeredAt ? new Date(triggeredAt).toLocaleTimeString() : 'just now';
-  const locationLine = location
-    ? `${location.latitude.toFixed(5)}, ${location.longitude.toFixed(5)}`
+
+  // The Pi can return a LocationFix with null lat/lng before GPS has fixed.
+  // Guard both fields independently — neither is safe to .toFixed() alone.
+  const lat = location?.latitude ?? null;
+  const lng = location?.longitude ?? null;
+  const hasCoords = lat != null && lng != null;
+
+  const locationLine = hasCoords
+    ? `${lat.toFixed(5)}, ${lng.toFixed(5)}`
     : 'Unknown (no GPS fix yet)';
 
   const openMaps = () => {
-    if (!location) return;
-    const url = `https://maps.google.com/?q=${location.latitude.toFixed(6)},${location.longitude.toFixed(6)}`;
+    if (!hasCoords) return;
+    const url = `https://maps.google.com/?q=${lat.toFixed(6)},${lng.toFixed(6)}`;
     Linking.openURL(url).catch((err) => console.warn('failed to open maps:', err));
   };
 
@@ -55,9 +62,9 @@ export function SosBanner({ visible, location, triggeredAt, onDismiss }: Props) 
           onPress={openMaps}
           style={({ pressed }) => [
             styles.button,
-            { opacity: location ? (pressed ? 0.7 : 1) : 0.4 },
+            { opacity: hasCoords ? (pressed ? 0.7 : 1) : 0.4 },
           ]}
-          disabled={!location}
+          disabled={!hasCoords}
         >
           <ThemedText style={styles.buttonText}>Open in Maps</ThemedText>
         </Pressable>

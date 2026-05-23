@@ -9,6 +9,7 @@ knows about concrete service / sensor classes.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 from core.config import Config
 from detection.alert_engine import AlertEngine
@@ -29,6 +30,7 @@ from services import (
     ElectricalLoggerService,
     LocationService,
     MessageService,
+    MetricsService,
     OutputService,
     SessionService,
     SosService,
@@ -64,6 +66,7 @@ class Container:
     session_service: SessionService
     electrical_logger: ElectricalLoggerService
     sos_service: SosService
+    metrics_service: MetricsService
     frame_buffer: FrameBuffer
 
     def start_all(self) -> None:
@@ -74,10 +77,12 @@ class Container:
         self.detection_service.start()
         self.electrical_logger.start()
         self.sos_service.start()
+        self.metrics_service.start()
         log.info("background services started")
 
     def stop_all(self) -> None:
         log = get_logger("api.container")
+        self.metrics_service.stop()
         self.sos_service.stop()
         self.electrical_logger.stop()
         self.detection_service.stop()
@@ -118,6 +123,13 @@ def build_container() -> Container:
     speaker = SpeakerController()
     output_queue = OutputQueue()
 
+    # Central place for the demo latency metrics. Logs each one as a
+    # structured INFO line and keeps a rolling history for /api/metrics.
+    # The LSTM sequence-data heartbeat (configured further down, once
+    # location_service exists) shows how much trajectory input the future
+    # TrajectoryService would have available right now.
+    metrics_service = MetricsService()
+
     output_service = OutputService(
         haptics=haptics,
         buzzer=buzzer,
@@ -149,6 +161,7 @@ def build_container() -> Container:
         output=output_service,
         detection_repo=detection_repo,
         alert_repo=alert_repo,
+        metrics=metrics_service,
     )
 
     location_service = LocationService(telemetry=telemetry, repository=location_repo)
@@ -175,7 +188,22 @@ def build_container() -> Container:
     sos_service = SosService(
         telemetry=telemetry,
         location_getter=location_service.latest,
+        metrics=metrics_service,
     )
+
+    # Late-bind the LSTM heartbeat data source. Reports how much
+    # trajectory input the planned MovementAnalyzer would have right now.
+    def _trajectory_snapshot() -> dict[str, Any]:
+        from utils.converters import unix_timestamp
+
+        since = unix_timestamp() - 3600
+        recent = location_repo.since(since)
+        return {
+            "window_size": len(recent),
+            "distance_today_km": round(location_service.distance_today_km(), 3),
+        }
+
+    metrics_service.set_trajectory_snapshot(_trajectory_snapshot)
 
     return Container(
         database=database,
@@ -190,6 +218,7 @@ def build_container() -> Container:
         session_service=session_service,
         electrical_logger=electrical_logger,
         sos_service=sos_service,
+        metrics_service=metrics_service,
         frame_buffer=frame_buffer,
     )
 

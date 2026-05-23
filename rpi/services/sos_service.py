@@ -27,6 +27,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from sensors import StickTelemetrySensor
+from services.metrics_service import MetricsService
 from utils.logger import get_logger
 
 # Minimum gap between two consecutive SOS rising-edge events. Prevents a
@@ -48,17 +49,20 @@ class SosService:
         self,
         telemetry: StickTelemetrySensor,
         location_getter: LocationGetter,
+        metrics: MetricsService | None = None,
         cooldown_s: float = _DEFAULT_COOLDOWN_S,
         poll_interval_s: float = _DEFAULT_POLL_INTERVAL_S,
     ) -> None:
         self._telemetry = telemetry
         self._location_getter = location_getter
+        self._metrics = metrics
         self._cooldown_s = cooldown_s
         self._poll_interval_s = poll_interval_s
         self._stop_flag = threading.Event()
         self._thread: threading.Thread | None = None
         self._last_sos_state = False
         self._last_fired_at = 0.0
+        self._edge_detected_at: float | None = None
         self._latest_event: dict[str, Any] | None = None
         self._lock = threading.Lock()
         self._log = get_logger("services.sos")
@@ -84,6 +88,7 @@ class SosService:
 
     def fire_test(self) -> dict[str, Any]:
         """Publish a synthetic SOS event without the physical button. For QA."""
+        self._edge_detected_at = time.monotonic()
         return self._fire(reason="test")
 
     def _run(self) -> None:
@@ -93,6 +98,10 @@ class SosService:
                 if reading.healthy:
                     sos_now = bool(reading.data.get("sos_active"))
                     if sos_now and not self._last_sos_state:
+                        # Capture the moment we *saw* the rising edge so the
+                        # latency measured in _fire() includes any time spent
+                        # inside the cooldown / publish path.
+                        self._edge_detected_at = time.monotonic()
                         self._fire(reason="button")
                     self._last_sos_state = sos_now
             except Exception as exc:
@@ -128,4 +137,13 @@ class SosService:
         self._log.warning("SOS event published (reason=%s)", reason)
         with self._lock:
             self._latest_event = dict(event)
+
+        # Record SOS-side latency: from the rising edge we observed in the
+        # SPI polling loop to the moment the event is on the wire for
+        # /api/status. Does not include the mobile app's poll interval.
+        if self._metrics is not None and self._edge_detected_at is not None:
+            latency_ms = (time.monotonic() - self._edge_detected_at) * 1000.0
+            self._metrics.record_sos_response(latency_ms=latency_ms, trigger=reason)
+        self._edge_detected_at = None
+
         return {"published": True, "event": event}

@@ -105,12 +105,16 @@ class DetectionLoop:
         self._last_inference_ms = int((time.monotonic() - inference_start) * 1000)
         self._frames_processed += 1
 
+        # Marker for "obstacle detection" latency: anything synthesized from a
+        # firmware-confirmed flag (drop / overhead) is measured from here.
+        telemetry_read_at = time.monotonic()
         telemetry = self._read_telemetry()
         lidar_distance = telemetry.get("lidar_distance_m") if telemetry else None
         detections = [self._build_detection(p, lidar_distance) for p in predictions]
 
         # Drop / overhead are firmware-confirmed flags — trust them directly
         # instead of re-thresholding raw distances on the RPi.
+        firmware_flag_sources: list[str] = []
         if telemetry is not None:
             if telemetry.get("overhead_detected"):
                 detections.append(
@@ -118,10 +122,12 @@ class DetectionLoop:
                         ObjectClass.OVERHEAD, Config.ESP32_OVERHEAD_DETECTION_M
                     )
                 )
+                firmware_flag_sources.append("overhead")
             if telemetry.get("drop_detected"):
                 detections.append(
                     self._synthetic_detection(ObjectClass.STAIRS, Config.ESP32_DROP_DETECTION_M)
                 )
+                firmware_flag_sources.append("drop")
 
         if self._frame_buffer is not None:
             annotated = self._annotate_frame(frame, predictions, detections)
@@ -132,6 +138,8 @@ class DetectionLoop:
                 "inference_ms": self._last_inference_ms,
                 "frame_width": reading.data.get("width"),
                 "frame_height": reading.data.get("height"),
+                "telemetry_read_at": telemetry_read_at,
+                "firmware_flag_sources": firmware_flag_sources,
             }
             self._on_detections(detections, meta)
 
