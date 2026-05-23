@@ -91,6 +91,18 @@ export const api = {
       body: JSON.stringify({ text, priority }),
     }),
   messageHistory: () => request<{ messages: MessageHistoryItem[] }>('/api/message/history'),
+
+  // --- Push notifications ---
+  registerPushToken: (push_token: string, label?: string, platform?: 'ios' | 'android') =>
+    request<CommandAck>('/api/notifications/register', {
+      method: 'POST',
+      body: JSON.stringify({ push_token, label, platform }),
+    }),
+  testNotification: () =>
+    request<{ sent: number; suppressed?: boolean; errors?: string[] }>(
+      '/api/notifications/test',
+      { method: 'POST' },
+    ),
 };
 
 export { ApiError };

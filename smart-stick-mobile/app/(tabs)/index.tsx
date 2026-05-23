@@ -4,12 +4,13 @@
  * Polls /api/battery and /api/status; degrades to an offline state if the
  * stick is unreachable.
  */
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BatteryCard } from '@/components/battery-card';
 import { InfoRow } from '@/components/info-row';
+import { SosBanner } from '@/components/sos-banner';
 import { StatusBadge } from '@/components/status-badge';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -27,6 +28,12 @@ export default function HomeScreen() {
   const inferenceMs = status.data?.detection.inference_time_ms ?? null;
   const lastSync = battery.data?.timestamp ?? status.data?.timestamp ?? null;
 
+  // Track which SOS timestamps the guardian has acknowledged so the banner
+  // can be dismissed but reappear instantly if the user presses SOS again.
+  const sos = status.data?.sos ?? null;
+  const [acknowledgedAt, setAcknowledgedAt] = useState<string | null>(null);
+  const sosVisible = sos != null && sos.timestamp !== acknowledgedAt;
+
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView
@@ -39,6 +46,13 @@ export default function HomeScreen() {
           <ThemedText type="title">Smart Stick</ThemedText>
           <StatusBadge online={online} />
         </View>
+
+        <SosBanner
+          visible={sosVisible}
+          location={status.data?.location ?? null}
+          triggeredAt={sos?.timestamp ?? null}
+          onDismiss={() => setAcknowledgedAt(sos?.timestamp ?? null)}
+        />
 
         <BatteryCard battery={battery.data} />
 

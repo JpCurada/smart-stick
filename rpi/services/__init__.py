@@ -5,8 +5,10 @@ from services.detection_service import DetectionService
 from services.location_service import LocationService
 from services.logger_service import ElectricalLoggerService
 from services.message_service import MessageService
+from services.notification_service import NotificationService
 from services.output_service import OutputService
 from services.session_service import SessionService
+from services.sos_service import SosService
 
 __all__ = [
     "BatteryService",
@@ -14,6 +16,8 @@ __all__ = [
     "LocationService",
     "ElectricalLoggerService",
     "MessageService",
+    "NotificationService",
     "OutputService",
     "SessionService",
+    "SosService",
 ]

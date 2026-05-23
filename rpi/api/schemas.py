@@ -31,3 +31,9 @@ class CommandAck(BaseModel):
     success: bool
     command_id: str | None = None
     message: str | None = None
+
+
+class NotificationRegisterRequest(BaseModel):
+    push_token: str = Field(min_length=1, max_length=256)
+    label: str | None = Field(default=None, max_length=64)
+    platform: str | None = Field(default=None, pattern="^(ios|android)$")

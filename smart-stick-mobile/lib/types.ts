@@ -66,6 +66,16 @@ export interface CommandAck {
   message: string | null;
 }
 
+export interface SosEvent {
+  type: 'sos';
+  trigger: 'button' | 'test';
+  timestamp: string;
+  latitude: number | null;
+  longitude: number | null;
+  maps_url: string | null;
+  deep_link: string;
+}
+
 export interface StatusResponse {
   battery: BatteryStatus | null;
   location: LocationFix | null;
@@ -75,6 +85,7 @@ export interface StatusResponse {
     inference_time_ms: number;
     latest_alert: AlertDto | null;
   };
+  sos: SosEvent | null;
   timestamp: string;
 }
 

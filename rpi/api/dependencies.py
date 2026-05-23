@@ -29,8 +29,10 @@ from services import (
     ElectricalLoggerService,
     LocationService,
     MessageService,
+    NotificationService,
     OutputService,
     SessionService,
+    SosService,
 )
 from storage import (
     AlertRepository,
@@ -39,6 +41,7 @@ from storage import (
     Database,
     DetectionRepository,
     ElectricalRepository,
+    GuardianDeviceRepository,
     LocationRepository,
     MessageRepository,
     SessionRepository,
@@ -62,6 +65,8 @@ class Container:
     message_service: MessageService
     session_service: SessionService
     electrical_logger: ElectricalLoggerService
+    notification_service: NotificationService
+    sos_service: SosService
     frame_buffer: FrameBuffer
 
     def start_all(self) -> None:
@@ -71,15 +76,18 @@ class Container:
         self.battery_service.start()
         self.detection_service.start()
         self.electrical_logger.start()
+        self.sos_service.start()
         log.info("background services started")
 
     def stop_all(self) -> None:
         log = get_logger("api.container")
+        self.sos_service.stop()
         self.electrical_logger.stop()
         self.detection_service.stop()
         self.battery_service.stop()
         self.location_service.stop()
         self.output_queue.stop()
+        self.notification_service.close()
         self.spi_link.close()
         self.database.close()
         log.info("background services stopped")
@@ -100,6 +108,7 @@ def build_container() -> Container:
     alert_repo = AlertRepository(database)
     session_repo = SessionRepository(database)
     electrical_repo = ElectricalRepository(database)
+    guardian_repo = GuardianDeviceRepository(database)
 
     # SPI link to the ESP32 sensor hub — shared by the telemetry sensor
     # (reads) and the haptics / buzzer controllers (command overrides).
@@ -168,6 +177,13 @@ def build_container() -> Container:
         inference_ms_callback=detection_service.inference_time_ms,
     )
 
+    notification_service = NotificationService(repository=guardian_repo)
+    sos_service = SosService(
+        telemetry=telemetry,
+        notifications=notification_service,
+        location_getter=location_service.latest,
+    )
+
     return Container(
         database=database,
         output_queue=output_queue,
@@ -180,6 +196,8 @@ def build_container() -> Container:
         message_service=message_service,
         session_service=session_service,
         electrical_logger=electrical_logger,
+        notification_service=notification_service,
+        sos_service=sos_service,
         frame_buffer=frame_buffer,
     )
 

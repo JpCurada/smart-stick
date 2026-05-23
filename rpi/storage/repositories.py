@@ -329,6 +329,38 @@ class ElectricalRepository:
         return [_row_to_dict(r) for r in rows]
 
 
+class GuardianDeviceRepository:
+    """Push tokens for guardian phones that should receive SOS alerts."""
+
+    def __init__(self, db: Database) -> None:
+        self._db = db
+
+    def save(self, push_token: str, label: str | None = None, platform: str | None = None) -> None:
+        now = iso_timestamp()
+        self._db.execute(
+            """
+            INSERT INTO guardian_devices (push_token, label, platform, registered_at, last_seen_at)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(push_token) DO UPDATE SET
+                label = excluded.label,
+                platform = excluded.platform,
+                last_seen_at = excluded.last_seen_at
+            """,
+            (push_token, label, platform, now, now),
+        )
+
+    def all_tokens(self) -> list[str]:
+        rows = self._db.fetch_all("SELECT push_token FROM guardian_devices")
+        return [r["push_token"] for r in rows]
+
+    def all(self) -> list[dict[str, Any]]:
+        rows = self._db.fetch_all("SELECT * FROM guardian_devices ORDER BY registered_at DESC")
+        return [_row_to_dict(r) for r in rows]
+
+    def clear(self) -> None:
+        self._db.execute("DELETE FROM guardian_devices")
+
+
 def encode_json(payload: dict[str, Any]) -> str:
     """Helper used by services when building *_json columns."""
     return json.dumps(payload, separators=(",", ":"), default=str)
