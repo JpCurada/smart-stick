@@ -1,19 +1,21 @@
-"""Watch the ESP32 telemetry packet for the SOS flag and fan out alerts.
+"""Watch the ESP32 telemetry packet for the SOS flag and surface the event.
 
 The ESP32 firmware sets ``sos_active = 1`` in its SPI packet when the cane
 user holds the physical SOS button. This service polls the telemetry
 sensor on a background thread, detects the **rising edge** of that flag
-(false -> true), and dispatches one push notification per press.
+(false -> true), and records the event so the mobile app can pick it up
+on its next ``GET /api/status`` poll.
 
-The notification payload includes:
+Notification strategy
+---------------------
+This project intentionally has no OS push notifications. The mobile app
+is foreground-only: when the guardian opens it, it polls ``/api/status``
+and renders an in-app red banner whenever ``sos`` is fresh and not yet
+acknowledged. This keeps the whole stack on the local network with no
+cloud dependency.
 
-- timestamp of the press
-- current GPS lat / lng (or "unknown" if no fix yet)
-- a Google Maps deep link the guardian can tap
-- an in-app deep link (``smartstick://location``) to jump to the live view
-
-The push is decoupled from the SPI poll loop so any HTTPS slowness never
-delays the next telemetry read.
+The latest event is exposed via :meth:`latest_event` and consumed by the
+``/api/status`` route.
 """
 
 from __future__ import annotations
@@ -25,12 +27,11 @@ from datetime import datetime, timezone
 from typing import Any
 
 from sensors import StickTelemetrySensor
-from services.notification_service import NotificationService
 from utils.logger import get_logger
 
-# Minimum gap between two consecutive SOS pushes. The ESP32 button is a
-# toggle (2s hold), but if the user double-presses we still send at most
-# one push per this window — keeps the guardian's lock screen sane.
+# Minimum gap between two consecutive SOS rising-edge events. Prevents a
+# bouncy button or quick double-press from publishing two events back to
+# back; the second is dropped silently.
 _DEFAULT_COOLDOWN_S = 10.0
 
 # How often the watcher polls the telemetry sensor.
@@ -41,18 +42,16 @@ LocationGetter = Callable[[], dict[str, Any] | None]
 
 
 class SosService:
-    """Background watcher that fires push notifications on SOS rising edges."""
+    """Background watcher that records SOS events for the in-app banner."""
 
     def __init__(
         self,
         telemetry: StickTelemetrySensor,
-        notifications: NotificationService,
         location_getter: LocationGetter,
         cooldown_s: float = _DEFAULT_COOLDOWN_S,
         poll_interval_s: float = _DEFAULT_POLL_INTERVAL_S,
     ) -> None:
         self._telemetry = telemetry
-        self._notifications = notifications
         self._location_getter = location_getter
         self._cooldown_s = cooldown_s
         self._poll_interval_s = poll_interval_s
@@ -65,7 +64,7 @@ class SosService:
         self._log = get_logger("services.sos")
 
     def latest_event(self) -> dict[str, Any] | None:
-        """Most recent SOS event payload (or None). Used by /api/status."""
+        """Most recent SOS event payload (or ``None``). Used by ``/api/status``."""
         with self._lock:
             return dict(self._latest_event) if self._latest_event else None
 
@@ -84,7 +83,7 @@ class SosService:
             self._thread = None
 
     def fire_test(self) -> dict[str, Any]:
-        """Send a dummy SOS without needing the physical button. For QA."""
+        """Publish a synthetic SOS event without the physical button. For QA."""
         return self._fire(reason="test")
 
     def _run(self) -> None:
@@ -104,7 +103,7 @@ class SosService:
         now = time.monotonic()
         if now - self._last_fired_at < self._cooldown_s:
             self._log.debug("sos fire suppressed (cooldown)")
-            return {"sent": 0, "suppressed": True}
+            return {"published": False, "suppressed": True}
         self._last_fired_at = now
 
         ts = datetime.now(timezone.utc)
@@ -114,23 +113,19 @@ class SosService:
 
         if lat is not None and lng is not None:
             maps_url = f"https://maps.google.com/?q={lat:.6f},{lng:.6f}"
-            location_line = f"{lat:.5f}, {lng:.5f}"
         else:
             maps_url = None
-            location_line = "Unknown (no GPS fix yet)"
 
-        body = f"Time: {ts.strftime('%H:%M:%S')}\nLocation: {location_line}"
-        data = {
+        event = {
             "type": "sos",
             "trigger": reason,
             "timestamp": ts.isoformat(),
             "latitude": lat,
             "longitude": lng,
             "maps_url": maps_url,
-            "deep_link": "smartstick://location",
         }
 
-        self._log.warning("SOS fired (reason=%s) — notifying guardians", reason)
+        self._log.warning("SOS event published (reason=%s)", reason)
         with self._lock:
-            self._latest_event = dict(data)
-        return self._notifications.send(title="Emergency SOS", body=body, data=data)
+            self._latest_event = dict(event)
+        return {"published": True, "event": event}

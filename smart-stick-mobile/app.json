@@ -9,10 +9,7 @@
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true,
-      "infoPlist": {
-        "UIBackgroundModes": ["remote-notification"]
-      }
+      "supportsTablet": true
     },
     "android": {
       "package": "com.jpcurada.smartstick",
@@ -40,14 +37,7 @@
           }
         }
       ],
-      "expo-font",
-      [
-        "expo-notifications",
-        {
-          "icon": "./assets/images/icon.png",
-          "color": "#ff231f7c"
-        }
-      ]
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true,

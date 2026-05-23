@@ -1,0 +1,17 @@
+[Unit]
+Description=Smart Stick — auto-connect Bluetooth earpiece
+After=bluetooth.service
+Requires=bluetooth.service
+# Wait until graphical/user session is ready so per-user PulseAudio exists.
+After=sound.target
+
+[Service]
+Type=oneshot
+# Replace MAC_PLACEHOLDER with your earpiece MAC (the value in ~/.smartstick-bt-mac).
+ExecStart=/usr/bin/bluetoothctl connect MAC_PLACEHOLDER
+# Retry a few times in case the earpiece is slow to wake.
+ExecStartPost=/bin/sh -c 'for i in 1 2 3 4 5; do bluetoothctl info MAC_PLACEHOLDER | grep -q "Connected: yes" && exit 0; sleep 2; bluetoothctl connect MAC_PLACEHOLDER; done; exit 0'
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

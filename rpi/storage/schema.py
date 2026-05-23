@@ -171,18 +171,6 @@ CREATE TABLE IF NOT EXISTS geofences (
 """
 
 
-GUARDIAN_DEVICES_DDL: Final[str] = """
-CREATE TABLE IF NOT EXISTS guardian_devices (
-    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    push_token      TEXT UNIQUE NOT NULL,
-    label           TEXT,
-    platform        TEXT,
-    registered_at   TEXT NOT NULL,
-    last_seen_at    TEXT
-);
-"""
-
-
 INDEXES: Final[tuple[str, ...]] = (
     "CREATE INDEX IF NOT EXISTS idx_detections_ts ON detections(unix_ts);",
     "CREATE INDEX IF NOT EXISTS idx_detections_alert ON detections(alert_triggered);",
@@ -208,5 +196,4 @@ ALL_TABLES: Final[tuple[str, ...]] = (
     ELECTRICAL_DDL,
     SENSOR_HEALTH_DDL,
     GEOFENCES_DDL,
-    GUARDIAN_DEVICES_DDL,
 )

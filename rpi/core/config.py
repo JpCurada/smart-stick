@@ -117,6 +117,7 @@ class Config:
     ALERT_COOLDOWN_S: Final[float] = _env_float("ALERT_COOLDOWN_S", 3.0)
     ELECTRICAL_LOG_INTERVAL_S: Final[int] = _env_int("ELECTRICAL_LOG_INTERVAL_S", 30)
 
+    TTS_ENABLED: Final[bool] = _env_bool("TTS_ENABLED", True)
     TTS_RATE_WPM: Final[int] = _env_int("TTS_RATE_WPM", 80)
     TTS_VOLUME: Final[float] = _env_float("TTS_VOLUME", 1.0)
 

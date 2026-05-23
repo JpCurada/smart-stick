@@ -8,13 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import StreamingResponse
 
 from api.dependencies import Container, get_container
-from api.schemas import (
-    BuzzRequest,
-    CommandAck,
-    MessageRequest,
-    NotificationRegisterRequest,
-    VibrateRequest,
-)
+from api.schemas import BuzzRequest, CommandAck, MessageRequest, VibrateRequest
 from storage import DetectionRepository, LocationRepository
 from utils.converters import iso_timestamp, unix_timestamp
 
@@ -196,26 +190,15 @@ def emergency_sos(c: Container = Depends(_container)) -> CommandAck:
     return CommandAck(success=True, command_id=command_id)
 
 
-# --------------------------- Notifications ----------------------------------- #
-
-
-@router.post("/notifications/register", response_model=CommandAck)
-def register_notification_device(
-    request: NotificationRegisterRequest,
-    c: Container = Depends(_container),
-) -> CommandAck:
-    """Store a guardian phone's Expo push token so SOS pushes can reach it."""
-    c.notification_service.register(
-        push_token=request.push_token,
-        label=request.label,
-        platform=request.platform,
-    )
-    return CommandAck(success=True, message="device registered")
+# --------------------------- SOS test ---------------------------------------- #
 
 
 @router.post("/notifications/test", response_model=dict)
-def test_notification(c: Container = Depends(_container)) -> dict[str, Any]:
-    """Fire a dummy SOS push to every registered device — for QA only."""
+def test_sos(c: Container = Depends(_container)) -> dict[str, Any]:
+    """Publish a synthetic SOS event without the physical button. For QA.
+
+    The in-app banner picks this up on the next /api/status poll.
+    """
     return c.sos_service.fire_test()
 
 

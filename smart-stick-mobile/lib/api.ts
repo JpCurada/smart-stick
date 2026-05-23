@@ -92,17 +92,13 @@ export const api = {
     }),
   messageHistory: () => request<{ messages: MessageHistoryItem[] }>('/api/message/history'),
 
-  // --- Push notifications ---
-  registerPushToken: (push_token: string, label?: string, platform?: 'ios' | 'android') =>
-    request<CommandAck>('/api/notifications/register', {
+  // --- SOS test ---
+  // Fire a synthetic SOS event without holding the physical button. The
+  // in-app banner will appear on the next /api/status poll. Handy for QA.
+  testSos: () =>
+    request<{ sent: number; suppressed?: boolean }>('/api/notifications/test', {
       method: 'POST',
-      body: JSON.stringify({ push_token, label, platform }),
     }),
-  testNotification: () =>
-    request<{ sent: number; suppressed?: boolean; errors?: string[] }>(
-      '/api/notifications/test',
-      { method: 'POST' },
-    ),
 };
 
 export { ApiError };

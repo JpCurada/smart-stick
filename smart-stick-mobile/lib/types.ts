@@ -18,8 +18,8 @@ export interface BatteryStatus {
 }
 
 export interface LocationFix {
-  latitude: number;
-  longitude: number;
+  latitude: number | null;
+  longitude: number | null;
   altitude: number | null;
   accuracy_m: number | null;
   timestamp: string;
@@ -73,7 +73,6 @@ export interface SosEvent {
   latitude: number | null;
   longitude: number | null;
   maps_url: string | null;
-  deep_link: string;
 }
 
 export interface StatusResponse {

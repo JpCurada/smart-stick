@@ -31,6 +31,9 @@ class SpeakerController:
         self._init_engine()
 
     def _init_engine(self) -> None:
+        if not Config.TTS_ENABLED:
+            self._log.info("TTS disabled via TTS_ENABLED=false; speech will log only")
+            return
         if not _TTS_AVAILABLE:
             self._log.warning("pyttsx3 unavailable; TTS will log only")
             return

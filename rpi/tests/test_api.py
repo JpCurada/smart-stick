@@ -94,10 +94,9 @@ def _build_test_container(database):
     electrical_logger = MagicMock()
     frame_buffer = MagicMock()
 
-    notification_service = MagicMock()
-    notification_service.send.return_value = {"sent": 0}
     sos_service = MagicMock()
-    sos_service.fire_test.return_value = {"sent": 0, "test": True}
+    sos_service.fire_test.return_value = {"published": True}
+    sos_service.latest_event.return_value = None
 
     return Container(
         database=database,
@@ -111,7 +110,6 @@ def _build_test_container(database):
         message_service=message_service,
         session_service=session_service,
         electrical_logger=electrical_logger,
-        notification_service=notification_service,
         sos_service=sos_service,
         frame_buffer=frame_buffer,
     )

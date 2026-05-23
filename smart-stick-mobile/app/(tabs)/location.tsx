@@ -21,12 +21,14 @@ import { api } from '@/lib/api';
 
 export default function LocationScreen() {
   const location = usePoll(useCallback(() => api.location(), []), POLL_INTERVALS.location);
-  const online = location.error == null && location.data != null;
+  const lat = typeof location.data?.latitude === 'number' ? location.data.latitude : null;
+  const lon = typeof location.data?.longitude === 'number' ? location.data.longitude : null;
+  const hasFix = lat != null && lon != null;
+  const online = location.error == null && hasFix;
 
   const openInMaps = () => {
-    if (!location.data) return;
-    const { latitude, longitude } = location.data;
-    const url = `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
+    if (!hasFix) return;
+    const url = `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`;
     void Linking.openURL(url);
   };
 
@@ -43,12 +45,12 @@ export default function LocationScreen() {
           <StatusBadge online={online} label={online ? 'Live' : 'No fix'} />
         </View>
 
-        {location.data ? (
+        {hasFix ? (
           <View style={styles.mapWrap}>
             <LeafletMap
-              latitude={location.data.latitude}
-              longitude={location.data.longitude}
-              accuracyM={location.data.accuracy_m ?? null}
+              latitude={lat}
+              longitude={lon}
+              accuracyM={location.data?.accuracy_m ?? null}
             />
             <Pressable onPress={openInMaps} style={styles.openMapsBtn}>
               <ThemedText style={styles.openMapsLabel}>Open in Google Maps</ThemedText>
@@ -56,30 +58,31 @@ export default function LocationScreen() {
           </View>
         ) : (
           <ThemedView style={styles.mapPlaceholder}>
-            <ThemedText style={styles.mapPlaceholderText}>Waiting for first GPS fix…</ThemedText>
+            <ThemedText style={styles.mapPlaceholderText}>Indoors</ThemedText>
+            <ThemedText style={styles.mapPlaceholderHint}>
+              GPS only works outdoors.
+            </ThemedText>
           </ThemedView>
         )}
 
         <ThemedView style={styles.card}>
           <ThemedText type="subtitle">Details</ThemedText>
-          <InfoRow
-            label="Latitude"
-            value={location.data ? location.data.latitude.toFixed(6) : '—'}
-          />
-          <InfoRow
-            label="Longitude"
-            value={location.data ? location.data.longitude.toFixed(6) : '—'}
-          />
+          <InfoRow label="Latitude" value={lat != null ? lat.toFixed(6) : '—'} />
+          <InfoRow label="Longitude" value={lon != null ? lon.toFixed(6) : '—'} />
           <InfoRow
             label="Altitude"
             value={
-              location.data?.altitude != null ? `${location.data.altitude.toFixed(1)} m` : '—'
+              typeof location.data?.altitude === 'number'
+                ? `${location.data.altitude.toFixed(1)} m`
+                : '—'
             }
           />
           <InfoRow
             label="Accuracy"
             value={
-              location.data?.accuracy_m != null ? `±${location.data.accuracy_m.toFixed(0)} m` : '—'
+              typeof location.data?.accuracy_m === 'number'
+                ? `±${location.data.accuracy_m.toFixed(0)} m`
+                : '—'
             }
           />
           <InfoRow
@@ -94,7 +97,7 @@ export default function LocationScreen() {
 
         {!online && (
           <ThemedText style={styles.errorBanner}>
-            No GPS fix yet. The stick needs a clear view of the sky outdoors.
+            Indoors — no GPS signal. GPS only works outdoors with a clear view of the sky.
           </ThemedText>
         )}
       </ScrollView>
@@ -124,6 +127,13 @@ const styles = StyleSheet.create({
   mapPlaceholderText: {
     fontSize: 16,
     fontWeight: '600',
+  },
+  mapPlaceholderHint: {
+    fontSize: 13,
+    opacity: 0.7,
+    marginTop: 4,
+    textAlign: 'center',
+    paddingHorizontal: 16,
   },
   openMapsBtn: {
     paddingHorizontal: 16,
