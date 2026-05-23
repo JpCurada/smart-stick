@@ -105,6 +105,12 @@ class Config:
     ESP32_DROP_DETECTION_M: Final[float] = _env_float("ESP32_DROP_DETECTION_M", 0.25)
     ESP32_OVERHEAD_DETECTION_M: Final[float] = _env_float("ESP32_OVERHEAD_DETECTION_M", 0.5)
 
+    # UART bridge — used only by BatterySensor today (battery isn't in the
+    # SPI packet yet). When the bridge port is missing, BatterySensor falls
+    # back to a simulated drain so the rest of the system still boots.
+    ESP32_PORT: Final[str] = _env_str("ESP32_PORT", "/dev/serial0")
+    ESP32_BAUDRATE: Final[int] = _env_int("ESP32_BAUDRATE", 115200)
+
     HAPTICS_PIN: Final[int] = _env_int("HAPTICS_PIN", 26)
     BUZZER_PIN: Final[int] = _env_int("BUZZER_PIN", 27)
 
