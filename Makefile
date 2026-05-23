@@ -14,9 +14,9 @@ LAPTOP_IP ?= $(shell python -c \
    s.connect(('8.8.8.8',80)); print(s.getsockname()[0]); s.close()" 2>/dev/null)
 
 # Real RPi connection (override via env or CLI).
-RPI_HOST ?= raspberrypi.local
-RPI_USER ?= pi
-RPI_PORT ?= 5000
+RPI_HOST ?= smart-stick-ai-device.local
+RPI_USER ?= smart-stick-device
+RPI_PORT ?= 5050
 RPI_DIR  ?= /home/$(RPI_USER)/smart-stick/rpi
 
 # Paths
