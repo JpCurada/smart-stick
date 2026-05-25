@@ -48,6 +48,12 @@ class Config:
     CSV_LOG_PATH: Final[Path] = Path(
         _env_str("CSV_LOG_PATH", str(DATA_DIR / "electrical_parameters.csv"))
     )
+    # Combined metrics CSV. One row per recorded event (obstacle detection,
+    # recognition, SOS, find-my-stick, LSTM sample). Distinguishable by the
+    # 'metric' column. Consumed offline for analysis / demo charts.
+    TELEMETRY_CSV_PATH: Final[Path] = Path(
+        _env_str("TELEMETRY_CSV_PATH", str(DATA_DIR / "telemetry" / "metrics.csv"))
+    )
 
     API_HOST: Final[str] = _env_str("API_HOST", "0.0.0.0")
     API_PORT: Final[int] = _env_int("API_PORT", 5000)
@@ -134,3 +140,4 @@ class Config:
         """Create required directories if they don't exist."""
         cls.DATA_DIR.mkdir(parents=True, exist_ok=True)
         cls.DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        cls.TELEMETRY_CSV_PATH.parent.mkdir(parents=True, exist_ok=True)

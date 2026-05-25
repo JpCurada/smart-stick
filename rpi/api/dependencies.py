@@ -202,8 +202,9 @@ def build_container() -> Container:
 
     # Mock LSTM movement analyzer. Subscribes to the detection callback
     # fan-out (so it doesn't displace DetectionService's own dispatch)
-    # and emits navigational narration via SpeechPriority.LSTM.
-    movement_analyzer = MovementAnalyzer(output=output_service)
+    # and emits navigational narration via SpeechPriority.LSTM. Each
+    # narration also lands in the telemetry CSV via MetricsService.
+    movement_analyzer = MovementAnalyzer(output=output_service, metrics=metrics_service)
     detection_service.add_listener(movement_analyzer.on_detections)
 
     # Late-bind the LSTM heartbeat data source. Reports how much

@@ -24,6 +24,8 @@ _CSV_HEADERS = (
     "battery_percentage",
     "rpi_temp_c",
     "esp32_temp_c",
+    "esp32_voltage_v",
+    "esp32_current_ma",
     "wifi_signal_strength_db",
     "detection_fps",
     "inference_time_ms",
@@ -132,7 +134,22 @@ class ElectricalLoggerService:
 
     def _ensure_csv_header(self) -> None:
         if self._csv_path.exists() and self._csv_path.stat().st_size > 0:
-            return
+            try:
+                with open(self._csv_path, encoding="utf-8") as fh:
+                    first_line = fh.readline().strip()
+            except OSError:
+                first_line = ""
+            existing_cols = tuple(first_line.split(",")) if first_line else ()
+            if existing_cols == _CSV_HEADERS:
+                return
+            # Schema changed (e.g. added ESP32 power columns). Move the old
+            # file aside so future analyses can tell when the format flipped.
+            rotated = self._csv_path.with_suffix(f".{int(time.time())}.legacy.csv")
+            try:
+                self._csv_path.rename(rotated)
+                self._log.info("rotated electrical CSV due to schema drift: %s", rotated)
+            except OSError as exc:
+                self._log.debug("CSV rotation failed: %s", exc)
         with open(self._csv_path, "w", newline="", encoding="utf-8") as fh:
             writer = csv.writer(fh)
             writer.writerow(_CSV_HEADERS)
@@ -141,6 +158,9 @@ class ElectricalLoggerService:
         try:
             with open(self._csv_path, "a", newline="", encoding="utf-8") as fh:
                 writer = csv.writer(fh)
+                # ESP32 voltage / current stay blank until the firmware
+                # reports them over SPI. Column reserved so the schema is
+                # stable when that lands.
                 writer.writerow(
                     [
                         iso_timestamp(record.timestamp),
@@ -149,6 +169,8 @@ class ElectricalLoggerService:
                         record.battery_percentage,
                         record.rpi_temp_c,
                         record.esp32_temp_c,
+                        "",
+                        "",
                         record.wifi_signal_strength_db,
                         record.detection_fps,
                         record.inference_time_ms,

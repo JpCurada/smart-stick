@@ -43,13 +43,29 @@ cannot honestly measure.
 
 from __future__ import annotations
 
+import csv
+import json
 import threading
 import time
 from collections import deque
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
+from core.config import Config
+from utils.converters import iso_timestamp, now_utc
 from utils.logger import get_logger
+
+# Combined-CSV schema. Every recorded event (latency metric, LSTM
+# heartbeat, MovementAnalyzer narration) lands here with the same shape;
+# 'metric' distinguishes rows and 'extras_json' carries metric-specific
+# fields without forcing a wide-table schema.
+_CSV_HEADERS = (
+    "timestamp",
+    "metric",
+    "value_ms",
+    "extras_json",
+)
 
 # Rolling window of the most recent N samples kept in memory per metric.
 # Bigger = smoother averages; smaller = faster response on the demo card.
@@ -66,7 +82,11 @@ TrajectorySnapshotGetter = Callable[[], dict[str, Any]]
 class MetricsService:
     """Records timing events, logs them, keeps rolling stats per metric."""
 
-    def __init__(self, trajectory_snapshot: TrajectorySnapshotGetter | None = None) -> None:
+    def __init__(
+        self,
+        trajectory_snapshot: TrajectorySnapshotGetter | None = None,
+        csv_path: Path | None = None,
+    ) -> None:
         self._log = get_logger("services.metrics")
         self._lock = threading.Lock()
         # Per-metric: rolling history of (timestamp_s, value_ms) tuples.
@@ -74,6 +94,11 @@ class MetricsService:
         self._trajectory_snapshot = trajectory_snapshot
         self._stop_flag = threading.Event()
         self._thread: threading.Thread | None = None
+        # Append every recorded event to a flat CSV so we can analyze offline.
+        # File lives under data/telemetry/ by default; see Config.
+        self._csv_path = csv_path or Config.TELEMETRY_CSV_PATH
+        self._csv_lock = threading.Lock()
+        self._ensure_csv_header()
 
     # ── lifecycle ───────────────────────────────────────────────────────
 
@@ -105,8 +130,10 @@ class MetricsService:
         while not self._stop_flag.is_set():
             try:
                 snapshot = self._trajectory_snapshot() if self._trajectory_snapshot else {}
-                extras = " ".join(f"{k}={v}" for k, v in snapshot.items())
-                self._log.info("metric=lstm_sequence_data %s", extras)
+                # Route through _record so the same row also lands in the
+                # combined telemetry CSV. value_ms is unused for heartbeat —
+                # the meaningful payload lives in extras_json.
+                self._record("lstm_sequence_data", 0.0, **snapshot)
             except Exception as exc:
                 self._log.debug("heartbeat snapshot failed: %s", exc)
             self._stop_flag.wait(_HEARTBEAT_INTERVAL_S)
@@ -148,6 +175,19 @@ class MetricsService:
             command=command,
         )
 
+    def record_lstm_narration(
+        self, object_class: str, distance_m: float, position: str, suggestion: str
+    ) -> None:
+        """One MovementAnalyzer narration. value_ms unused for this metric."""
+        self._record(
+            "lstm_narration",
+            0.0,
+            object_class=object_class,
+            distance_m=round(distance_m, 2),
+            position=position,
+            suggestion=suggestion,
+        )
+
     def _record(self, metric: str, value_ms: float, **fields: Any) -> None:
         now_s = time.time()
         with self._lock:
@@ -160,6 +200,30 @@ class MetricsService:
             value_ms,
             extras,
         )
+        self._append_csv(metric, value_ms, fields)
+
+    def _ensure_csv_header(self) -> None:
+        try:
+            self._csv_path.parent.mkdir(parents=True, exist_ok=True)
+            if self._csv_path.exists() and self._csv_path.stat().st_size > 0:
+                return
+            with open(self._csv_path, "w", newline="", encoding="utf-8") as fh:
+                csv.writer(fh).writerow(_CSV_HEADERS)
+        except OSError as exc:
+            self._log.debug("telemetry CSV header init failed: %s", exc)
+
+    def _append_csv(self, metric: str, value_ms: float, fields: dict[str, Any]) -> None:
+        row = [
+            iso_timestamp(now_utc()),
+            metric,
+            f"{value_ms:.1f}",
+            json.dumps(fields, separators=(",", ":")) if fields else "",
+        ]
+        try:
+            with self._csv_lock, open(self._csv_path, "a", newline="", encoding="utf-8") as fh:
+                csv.writer(fh).writerow(row)
+        except OSError as exc:
+            self._log.debug("telemetry CSV append failed: %s", exc)
 
     # ── snapshot API (read-only) ────────────────────────────────────────
 

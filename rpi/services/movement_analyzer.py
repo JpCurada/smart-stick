@@ -22,6 +22,7 @@ from collections.abc import Callable
 from typing import Any
 
 from core.types import Detection, ObjectClass, SpeechPriority
+from services.metrics_service import MetricsService
 from services.output_service import OutputService
 from utils.converters import iso_timestamp, now_utc
 from utils.logger import get_logger
@@ -45,9 +46,11 @@ class MovementAnalyzer:
         self,
         output: OutputService,
         frame_width_getter: Callable[[], int | None] | None = None,
+        metrics: MetricsService | None = None,
     ) -> None:
         self._output = output
         self._frame_width_getter = frame_width_getter
+        self._metrics = metrics
         self._log = get_logger("services.movement")
         self._lock = threading.Lock()
         self._last_narration_at: float = 0.0
@@ -82,6 +85,14 @@ class MovementAnalyzer:
         }
         with self._lock:
             self._log_buffer.append(entry)
+
+        if self._metrics is not None:
+            self._metrics.record_lstm_narration(
+                object_class=target.object_class.value,
+                distance_m=target.distance_m,
+                position=position,
+                suggestion=suggestion,
+            )
 
         self._output.speak(text, priority="normal", source=SpeechPriority.LSTM)
 
