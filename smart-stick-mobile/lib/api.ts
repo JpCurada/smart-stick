@@ -13,6 +13,7 @@ import type {
   LocationFix,
   MessageHistoryItem,
   MessagePriority,
+  NavigationLogResponse,
   StatusResponse,
 } from './types';
 
@@ -67,6 +68,10 @@ export const api = {
   // --- Detections ---
   latestDetections: () => request<LatestDetectionsResponse>('/api/latest_detections'),
 
+  // --- Navigation (mock LSTM) ---
+  navigationLog: (limit = 50) =>
+    request<NavigationLogResponse>(`/api/navigation_log?limit=${limit}`),
+
   // --- Camera ---
   latestFrameUrl: () => `${API_BASE_URL}/api/latest_frame?ts=${Date.now()}`,
   streamUrl: () => `${API_BASE_URL}/api/stream`,
@@ -83,6 +88,7 @@ export const api = {
       body: JSON.stringify({ frequency_hz: frequencyHz, duration_ms: durationMs }),
     }),
   emergencySos: () => request<CommandAck>('/api/emergency/sos', { method: 'POST' }),
+  findMyStick: () => request<CommandAck>('/api/find', { method: 'POST' }),
 
   // --- Messages ---
   sendMessage: (text: string, priority: MessagePriority = 'normal') =>

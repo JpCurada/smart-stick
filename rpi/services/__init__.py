@@ -6,6 +6,7 @@ from services.location_service import LocationService
 from services.logger_service import ElectricalLoggerService
 from services.message_service import MessageService
 from services.metrics_service import MetricsService
+from services.movement_analyzer import MovementAnalyzer
 from services.output_service import OutputService
 from services.session_service import SessionService
 from services.sos_service import SosService
@@ -17,6 +18,7 @@ __all__ = [
     "ElectricalLoggerService",
     "MessageService",
     "MetricsService",
+    "MovementAnalyzer",
     "OutputService",
     "SessionService",
     "SosService",

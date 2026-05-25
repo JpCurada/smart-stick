@@ -160,7 +160,7 @@ class DetectionLoop:
             x1, y1, x2, y2 = pred.bbox
             color = self._class_color(pred.object_class)
             cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
-            label = f"{pred.object_class.value} {pred.confidence:.2f}"
+            label = f"{pred.raw_class_name} {pred.confidence:.2f}"
             if det.distance_m < 99.0:
                 label += f"  {det.distance_m:.1f}m"
             ((tw, th), baseline) = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)

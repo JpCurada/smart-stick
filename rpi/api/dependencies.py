@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from core.config import Config
+from core.types import SpeechPriority
 from detection.alert_engine import AlertEngine
 from detection.detector import DetectionLoop
 from detection.frame_buffer import FrameBuffer
@@ -31,6 +32,7 @@ from services import (
     LocationService,
     MessageService,
     MetricsService,
+    MovementAnalyzer,
     OutputService,
     SessionService,
     SosService,
@@ -67,6 +69,7 @@ class Container:
     electrical_logger: ElectricalLoggerService
     sos_service: SosService
     metrics_service: MetricsService
+    movement_analyzer: MovementAnalyzer
     frame_buffer: FrameBuffer
 
     def start_all(self) -> None:
@@ -169,8 +172,11 @@ def build_container() -> Container:
     battery_sensor = BatterySensor(bridge=bridge)
 
     def on_battery_warning(message: str, tone) -> None:
-        output_service.play_tone(tone)
-        output_service.speak(message, priority="high")
+        # System-tier announcement: same preemption rank as detection alerts,
+        # so it never interrupts a guardian message but still rides above
+        # ambient LSTM narration.
+        output_service.play_tone(tone, source="system")
+        output_service.speak(message, priority="high", source=SpeechPriority.DETECTION)
 
     battery_service = BatteryService(
         sensor=battery_sensor,
@@ -190,6 +196,15 @@ def build_container() -> Container:
         location_getter=location_service.latest,
         metrics=metrics_service,
     )
+    # Let OutputService suppress detection haptics+buzzer while the SOS
+    # button is held; earpiece TTS keeps flowing for guardian messages.
+    output_service.set_sos_active_getter(sos_service.is_active)
+
+    # Mock LSTM movement analyzer. Subscribes to the detection callback
+    # fan-out (so it doesn't displace DetectionService's own dispatch)
+    # and emits navigational narration via SpeechPriority.LSTM.
+    movement_analyzer = MovementAnalyzer(output=output_service)
+    detection_service.add_listener(movement_analyzer.on_detections)
 
     # Late-bind the LSTM heartbeat data source. Reports how much
     # trajectory input the planned MovementAnalyzer would have right now.
@@ -219,6 +234,7 @@ def build_container() -> Container:
         electrical_logger=electrical_logger,
         sos_service=sos_service,
         metrics_service=metrics_service,
+        movement_analyzer=movement_analyzer,
         frame_buffer=frame_buffer,
     )
 

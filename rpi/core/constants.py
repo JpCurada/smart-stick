@@ -32,6 +32,11 @@ VIBRATION_PATTERNS: Final[dict[ObjectClass, VibrationPattern]] = {
 
 BUZZER_TONES: Final[dict[str, BuzzerTone]] = {
     "standard_alert": BuzzerTone("standard_alert", 1000, 200),
+    # Overhead = high-pitched short bursts. Cue: "raise/protect your hand".
+    "overhead_alert": BuzzerTone("overhead_alert", 1800, 120, pattern_count=2, gap_ms=80),
+    # Ground (drop / lower-ultrasonic) = low-pitched longer pulse. Cue: "lift the stick".
+    "ground_alert": BuzzerTone("ground_alert", 700, 400, pattern_count=1),
+    # Kept for backwards compat with any caller still using the old name.
     "elevation_alert": BuzzerTone("elevation_alert", 1500, 300),
     "emergency_sos": BuzzerTone("emergency_sos", 2500, 500, pattern_count=3, gap_ms=200),
     "battery_warning": BuzzerTone("battery_warning", 800, 100, pattern_count=3, gap_ms=50),
@@ -82,6 +87,10 @@ YOLO_CLASS_MAP: Final[dict[str, ObjectClass]] = {
     "bus": ObjectClass.CAR,
     "truck": ObjectClass.CAR,
     "train": ObjectClass.CAR,
+    "chair": ObjectClass.OBSTACLE,
+    "bottle": ObjectClass.OBSTACLE,
+    "umbrella": ObjectClass.OBSTACLE,
+    "dining table": ObjectClass.OBSTACLE,
 }
 
 

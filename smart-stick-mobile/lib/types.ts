@@ -51,6 +51,21 @@ export interface LatestDetectionsResponse {
   timestamp: string;
 }
 
+export interface NavigationLogEntry {
+  id: string;
+  timestamp: string;
+  text: string;
+  object_class: string;
+  distance_m: number;
+  position: 'left' | 'ahead' | 'right';
+  suggestion: string;
+}
+
+export interface NavigationLogResponse {
+  entries: NavigationLogEntry[];
+  timestamp: string;
+}
+
 export interface MessageHistoryItem {
   message_id: string;
   timestamp: string;

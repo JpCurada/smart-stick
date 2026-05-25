@@ -62,6 +62,15 @@ class SpeakerController:
             self._log.warning("TTS failed: %s", exc)
             return False
 
+    def stop(self) -> None:
+        """Interrupt any in-progress utterance. Safe to call when idle."""
+        if self._engine is None:
+            return
+        try:
+            self._engine.stop()
+        except Exception as exc:
+            self._log.debug("TTS stop failed: %s", exc)
+
     def _rate_for_priority(self, priority: str) -> int:
         if priority == "high":
             return int(self._rate_wpm * 1.2)

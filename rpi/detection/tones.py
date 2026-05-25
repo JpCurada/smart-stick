@@ -5,12 +5,15 @@ from __future__ import annotations
 from core.constants import BUZZER_TONES
 from core.types import BuzzerTone, ObjectClass
 
-_ELEVATION_CLASSES = {ObjectClass.STAIRS, ObjectClass.OVERHEAD}
-
 
 def tone_for_alert(object_class: ObjectClass) -> BuzzerTone:
-    if object_class in _ELEVATION_CLASSES:
-        return BUZZER_TONES["elevation_alert"]
+    # Overhead = "raise your hand" (high-pitched bursts).
+    # Stairs / drop / lower-ultrasonic = "lift the stick" (low-pitched pulse).
+    # Everything else = standard.
+    if object_class is ObjectClass.OVERHEAD:
+        return BUZZER_TONES["overhead_alert"]
+    if object_class is ObjectClass.STAIRS:
+        return BUZZER_TONES["ground_alert"]
     return BUZZER_TONES["standard_alert"]
 
 

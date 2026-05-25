@@ -23,6 +23,7 @@ const MAPPING = {
   'message.fill': 'chat-bubble',
   'video.fill': 'videocam',
   'bolt.fill': 'bolt',
+  'figure.walk': 'directions-walk',
 } as IconMapping;
 
 /**

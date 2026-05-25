@@ -42,6 +42,17 @@ def detections_history(
     return {"detections": DetectionRepository(c.database).since(since)}
 
 
+@router.get("/navigation_log")
+def navigation_log(
+    limit: int = Query(default=50, ge=1, le=200),
+    c: Container = Depends(_container),
+) -> dict[str, Any]:
+    return {
+        "entries": c.movement_analyzer.recent(limit=limit),
+        "timestamp": iso_timestamp(),
+    }
+
+
 # --------------------------- Location ---------------------------------------- #
 
 

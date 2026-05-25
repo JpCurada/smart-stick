@@ -1,7 +1,7 @@
 /**
  * Tab 5: VIDEO — live MJPEG camera feed from the stick.
  */
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -14,14 +14,44 @@ import { POLL_INTERVALS } from '@/constants/api';
 import { Palette } from '@/constants/theme';
 import { usePoll } from '@/hooks/use-poll';
 import { api } from '@/lib/api';
+import type { DetectionDto } from '@/lib/types';
+
+const RECOGNITION_LOG_LIMIT = 30;
+
+type RecognitionLogEntry = DetectionDto & { key: string };
+
+const entryKey = (d: DetectionDto): string =>
+  `${d.timestamp}|${d.class}|${d.bbox ? d.bbox.join(',') : 'nobbox'}`;
 
 export default function VideoScreen() {
   const [streaming, setStreaming] = useState(false);
+  const [recognitionLog, setRecognitionLog] = useState<RecognitionLogEntry[]>([]);
+  const seenKeysRef = useRef<Set<string>>(new Set());
 
   const detections = usePoll(
     useCallback(() => api.latestDetections(), []),
     POLL_INTERVALS.detections,
   );
+
+  useEffect(() => {
+    const incoming = detections.data?.detections;
+    if (!incoming || incoming.length === 0) return;
+    const fresh: RecognitionLogEntry[] = [];
+    for (const det of incoming) {
+      const key = entryKey(det);
+      if (seenKeysRef.current.has(key)) continue;
+      seenKeysRef.current.add(key);
+      fresh.push({ ...det, key });
+    }
+    if (fresh.length === 0) return;
+    setRecognitionLog((prev) => {
+      const next = [...fresh.reverse(), ...prev].slice(0, RECOGNITION_LOG_LIMIT);
+      // Trim the seen-set so it doesn't grow unbounded.
+      const keep = new Set(next.map((e) => e.key));
+      seenKeysRef.current = keep;
+      return next;
+    });
+  }, [detections.data]);
 
   const fps = detections.data?.fps ?? null;
   const inferenceMs = detections.data?.inference_time_ms ?? null;
@@ -74,16 +104,26 @@ export default function VideoScreen() {
           />
         </ThemedView>
 
-        {detections.data?.alert && (
-          <ThemedView style={styles.alertCard}>
-            <ThemedText style={styles.alertTitle}>Latest alert</ThemedText>
-            <ThemedText style={styles.alertBody}>
-              {detections.data.alert.object_class} @{' '}
-              {detections.data.alert.distance_m.toFixed(1)} m ·{' '}
-              {detections.data.alert.severity}
+        <ThemedView style={styles.card}>
+          <ThemedText type="subtitle">Recognition</ThemedText>
+          {recognitionLog.length === 0 ? (
+            <ThemedText style={styles.logEmpty}>
+              No recognitions yet. Start the stream to begin logging.
             </ThemedText>
-          </ThemedView>
-        )}
+          ) : (
+            recognitionLog.map((entry) => (
+              <View key={entry.key} style={styles.logRow}>
+                <ThemedText style={styles.logClass}>{entry.class}</ThemedText>
+                <ThemedText style={styles.logMeta}>
+                  {entry.distance_m.toFixed(1)} m · {(entry.confidence * 100).toFixed(0)}%
+                </ThemedText>
+                <ThemedText style={styles.logTime}>
+                  {new Date(entry.timestamp).toLocaleTimeString()}
+                </ThemedText>
+              </View>
+            ))
+          )}
+        </ThemedView>
       </ScrollView>
     </SafeAreaView>
   );
@@ -119,17 +159,30 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(127,127,127,0.3)',
   },
-  alertCard: {
-    padding: 14,
-    borderRadius: 10,
-    backgroundColor: Palette.warning,
+  logEmpty: {
+    opacity: 0.6,
+    paddingVertical: 8,
   },
-  alertTitle: {
-    fontWeight: '700',
-    color: '#fff',
+  logRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(127,127,127,0.2)',
+    gap: 8,
   },
-  alertBody: {
-    color: '#fff',
+  logClass: {
+    flex: 1,
+    fontWeight: '600',
     textTransform: 'capitalize',
+  },
+  logMeta: {
+    opacity: 0.8,
+    fontVariant: ['tabular-nums'],
+  },
+  logTime: {
+    opacity: 0.55,
+    fontSize: 12,
+    fontVariant: ['tabular-nums'],
   },
 });

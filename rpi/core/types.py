@@ -36,6 +36,25 @@ class HealthStatus(str, Enum):
     CRITICAL = "critical"
 
 
+class SpeechPriority(str, Enum):
+    """Earpiece preemption hierarchy. Lower value = higher priority."""
+
+    GUARDIAN = "guardian"  # P1: from guardian via mobile app; preempts everything
+    LSTM = "lstm"  # P2: movement analyzer narration
+    DETECTION = "detection"  # P3: detection alert TTS
+
+    @property
+    def rank(self) -> int:
+        return _SPEECH_PRIORITY_RANK[self]
+
+
+_SPEECH_PRIORITY_RANK: dict[SpeechPriority, int] = {
+    SpeechPriority.GUARDIAN: 0,
+    SpeechPriority.LSTM: 1,
+    SpeechPriority.DETECTION: 2,
+}
+
+
 @dataclass(frozen=True)
 class Coordinates:
     latitude: float

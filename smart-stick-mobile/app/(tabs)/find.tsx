@@ -1,10 +1,11 @@
 /**
- * Tab 3: FIND — remote vibrate / sound to locate a lost stick.
+ * Tab 3: FIND — remote buzz + vibrate to locate a lost stick.
  *
- * Buttons fire optimistic POSTs to /api/vibrate and /api/emergency/sos.
- * A toast-style banner shows the result of the most recent command.
+ * Single button fires POST /api/find which triggers buzzer AND vibrator
+ * together on the cane and opens a 30-second window during which detection
+ * haptics/buzzer are suppressed so the find sequence isn't drowned out.
  */
-import { Vibrate, Volume2 } from 'lucide-react-native';
+import { Bell } from 'lucide-react-native';
 import { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -21,8 +22,7 @@ interface FeedbackState {
 }
 
 export default function FindScreen() {
-  const [vibrateLoading, setVibrateLoading] = useState(false);
-  const [soundLoading, setSoundLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState<FeedbackState | null>(null);
 
   const flash = (message: string, success: boolean) => {
@@ -30,27 +30,15 @@ export default function FindScreen() {
     setTimeout(() => setFeedback(null), 2500);
   };
 
-  const handleVibrate = async () => {
-    setVibrateLoading(true);
+  const handleFind = async () => {
+    setLoading(true);
     try {
-      await api.vibrate(255, 500);
-      flash('Vibrating stick…', true);
+      await api.findMyStick();
+      flash('Buzzing and vibrating the stick…', true);
     } catch {
       flash('Could not reach the stick.', false);
     } finally {
-      setVibrateLoading(false);
-    }
-  };
-
-  const handleSound = async () => {
-    setSoundLoading(true);
-    try {
-      await api.emergencySos();
-      flash('Playing SOS tone…', true);
-    } catch {
-      flash('Could not reach the stick.', false);
-    } finally {
-      setSoundLoading(false);
+      setLoading(false);
     }
   };
 
@@ -59,23 +47,16 @@ export default function FindScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <ThemedText type="title">Find Stick</ThemedText>
         <ThemedText style={styles.subtitle}>
-          Trigger a vibration or sound to help locate the stick if it&apos;s misplaced.
+          Make the stick buzz and vibrate so you can locate it.
         </ThemedText>
 
         <View style={styles.buttons}>
           <ActionButton
-            title="Vibrate Stick"
-            icon={Vibrate}
+            title="Find My Stick"
+            icon={Bell}
             color={Palette.primary}
-            onPress={handleVibrate}
-            loading={vibrateLoading}
-          />
-          <ActionButton
-            title="Play SOS Sound"
-            icon={Volume2}
-            color={Palette.warning}
-            onPress={handleSound}
-            loading={soundLoading}
+            onPress={handleFind}
+            loading={loading}
           />
         </View>
 
@@ -93,10 +74,10 @@ export default function FindScreen() {
         <ThemedView style={styles.note}>
           <ThemedText type="subtitle">Notes</ThemedText>
           <ThemedText style={styles.noteText}>
-            • Vibrate: max intensity for 500 ms.
+            • Buzzer plus vibration fire together for one short pulse.
           </ThemedText>
           <ThemedText style={styles.noteText}>
-            • SOS sound: 2500 Hz repeating tone — distinct from every other alert.
+            • Detection alerts are paused for 30 seconds so the find sequence is unambiguous.
           </ThemedText>
           <ThemedText style={styles.noteText}>
             • Works over the same WiFi network. BLE fallback is available when the stick is

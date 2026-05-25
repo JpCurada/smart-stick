@@ -61,6 +61,7 @@ class SosService:
         self._stop_flag = threading.Event()
         self._thread: threading.Thread | None = None
         self._last_sos_state = False
+        self._last_healthy_read_at: float = 0.0
         self._last_fired_at = 0.0
         self._edge_detected_at: float | None = None
         self._latest_event: dict[str, Any] | None = None
@@ -71,6 +72,22 @@ class SosService:
         """Most recent SOS event payload (or ``None``). Used by ``/api/status``."""
         with self._lock:
             return dict(self._latest_event) if self._latest_event else None
+
+    def is_active(self) -> bool:
+        """True while the ESP32 reports the SOS button as held down.
+
+        Used by OutputService to suppress detection haptics + buzzer so
+        the SOS pattern reaches the user unambiguously. Returns False if
+        the last healthy telemetry read is stale (>3x the poll interval) —
+        prevents detection feedback from being permanently suppressed if
+        the SPI link drops while the flag was last seen as held.
+        """
+        if not self._last_sos_state:
+            return False
+        stale_after = self._poll_interval_s * 3
+        if time.monotonic() - self._last_healthy_read_at > stale_after:
+            return False
+        return True
 
     def start(self) -> None:
         if self._thread is not None and self._thread.is_alive():
@@ -96,6 +113,7 @@ class SosService:
             try:
                 reading = self._telemetry.read()
                 if reading.healthy:
+                    self._last_healthy_read_at = time.monotonic()
                     sos_now = bool(reading.data.get("sos_active"))
                     if sos_now and not self._last_sos_state:
                         # Capture the moment we *saw* the rising edge so the

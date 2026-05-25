@@ -22,6 +22,9 @@ class MessageService:
             raise ValueError("message text cannot be empty")
         if len(text) > MAX_MESSAGE_LENGTH:
             text = text[:MAX_MESSAGE_LENGTH]
+        # Guardian source by default — OutputService.speak's default. No
+        # explicit source argument needed; this keeps the test contract
+        # (output.speak called with text + priority only) intact.
         message_id = self._output.speak(text, priority=priority)
         return {
             "message_id": message_id,

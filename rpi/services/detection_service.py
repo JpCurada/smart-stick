@@ -6,7 +6,7 @@ import threading
 import time
 import uuid
 
-from core.types import Detection
+from core.types import Detection, SpeechPriority
 from detection.alert_engine import AlertDecision, AlertEngine
 from detection.detector import DetectionLoop
 from services.metrics_service import MetricsService
@@ -44,7 +44,20 @@ class DetectionService:
         self._latest_detections: list[Detection] = []
         self._latest_alert: dict | None = None
         self._lock = threading.Lock()
+        # Additional listeners (e.g. MovementAnalyzer) fan-out from here so
+        # the DetectionLoop keeps its single-callback contract.
+        self._listeners: list[
+            callable  # signature: (detections, meta) -> None
+        ] = []
         self._loop.set_callback(self._on_detections)
+
+    def add_listener(self, listener) -> None:
+        """Register an extra subscriber. Runs after the core dispatch path.
+
+        Listener failures are logged and swallowed so one bad subscriber
+        cannot break detection alerts.
+        """
+        self._listeners.append(listener)
 
     def start(self) -> None:
         self._loop.start()
@@ -80,6 +93,12 @@ class DetectionService:
         with self._lock:
             self._latest_detections = list(detections)
 
+        for listener in self._listeners:
+            try:
+                listener(detections, meta)
+            except Exception as exc:
+                self._log.debug("detection listener failed: %s", exc)
+
     def _record_recognition_metric(self, detection: Detection, meta: dict) -> None:
         """YOLO recognized + classified one object. Log its inference time."""
         if self._metrics is None or detection.bbox is None:
@@ -109,11 +128,13 @@ class DetectionService:
 
     def _dispatch(self, detection: Detection, decision: AlertDecision) -> None:
         if decision.vibration is not None:
-            self._output.play_vibration_pattern(decision.vibration)
+            self._output.play_vibration_pattern(decision.vibration, source="detection")
         if decision.tone is not None:
-            self._output.play_tone(decision.tone)
+            self._output.play_tone(decision.tone, source="detection")
         if decision.speak_text:
-            self._output.speak(decision.speak_text, priority="high")
+            self._output.speak(
+                decision.speak_text, priority="high", source=SpeechPriority.DETECTION
+            )
         self._record_alert(detection, decision)
 
     def _record_alert(self, detection: Detection, decision: AlertDecision) -> None:
