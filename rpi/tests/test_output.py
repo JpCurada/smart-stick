@@ -218,3 +218,55 @@ class TestSpeechHierarchy:
         finally:
             speaker.release()
             queue.stop()
+
+    def test_speech_does_not_use_shared_feedback_queue(self) -> None:
+        # Guardian/LSTM/detection speech must NOT go through the shared
+        # OutputQueue (which can report "output queue full; dropping").
+        speaker = _GatedSpeaker()
+        fake_queue = MagicMock()
+        svc = OutputService(
+            haptics=MagicMock(),
+            buzzer=MagicMock(),
+            speaker=speaker,  # type: ignore[arg-type]
+            queue=fake_queue,
+            command_repo=MagicMock(),
+            message_repo=None,
+        )
+        try:
+            svc.speak("guardian here", source=SpeechPriority.GUARDIAN)
+            assert speaker.wait_started()
+            fake_queue.submit.assert_not_called()
+        finally:
+            speaker.release()
+            svc.stop()
+
+
+class TestFindMyStick:
+    """Find must re-assert a COMBINED buzz+vibrate frame repeatedly, because
+    the firmware cancels a one-shot RPi override on its next loop."""
+
+    def test_find_reasserts_combined_frame_repeatedly(self) -> None:
+        link = MagicMock()
+        link.send_command.return_value = True
+        svc = OutputService(
+            haptics=MagicMock(),
+            buzzer=MagicMock(),
+            speaker=MagicMock(),
+            queue=MagicMock(),
+            command_repo=MagicMock(),
+            message_repo=None,
+            link=link,
+        )
+        svc.find_my_stick()
+        # Let the Find thread re-assert for a moment, then stop it.
+        time.sleep(0.2)
+        svc.stop()
+
+        calls = link.send_command.call_args_list
+        # Re-asserted many times (interval ~30ms over ~200ms), not once.
+        assert len(calls) > 1
+        # Every Find frame drives buzzer AND vibrator in the SAME command, so
+        # neither output cancels the other.
+        for c in calls:
+            assert c.kwargs.get("buzzer_cmd", c.args[0] if c.args else 0) != 0
+            assert c.kwargs.get("vibrator_cmd", c.args[1] if len(c.args) > 1 else 0) != 0

@@ -82,6 +82,7 @@ class Container:
         self.electrical_logger.stop()
         self.detection_service.stop()
         self.location_service.stop()
+        self.output_service.stop()
         self.output_queue.stop()
         self.spi_link.close()
         self.database.close()
@@ -126,6 +127,7 @@ def build_container() -> Container:
         queue=output_queue,
         command_repo=command_repo,
         message_repo=message_repo,
+        link=spi_link,
     )
     message_service = MessageService(output=output_service, repository=message_repo)
     session_service = SessionService(repository=session_repo)

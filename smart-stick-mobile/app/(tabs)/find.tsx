@@ -26,13 +26,6 @@ import { api } from '@/lib/api';
 const VIBRATE_COLOR = '#34d399';
 const SOUND_COLOR = '#f97316';
 
-// "Find" alert parameters. Max intensity + a long, high-frequency beep so
-// the stick is as noticeable as possible while searching.
-const FIND_VIBRATE_INTENSITY = 255;
-const FIND_VIBRATE_MS = 800;
-const FIND_BUZZ_HZ = 2500;
-const FIND_BUZZ_MS = 800;
-
 type Pending = 'vibrate' | 'sound' | null;
 
 interface FeedbackState {
@@ -54,11 +47,14 @@ export default function FindScreen() {
     setTimeout(() => setFeedback(null), 2500);
   };
 
-  const handleVibrate = async () => {
-    setPending('vibrate');
+  // Both buttons trigger the same combined buzz+vibrate Find alert on the
+  // stick (POST /api/find). The backend re-asserts the override for the full
+  // alert duration so the firmware doesn't cancel it after one loop.
+  const handleFind = async (which: 'vibrate' | 'sound') => {
+    setPending(which);
     try {
-      await api.vibrate(FIND_VIBRATE_INTENSITY, FIND_VIBRATE_MS);
-      flash('Vibrating the stick…', true);
+      await api.findMyStick();
+      flash(which === 'vibrate' ? 'Vibrating the stick…' : 'Alerting the stick…', true);
     } catch {
       flash('Could not reach the stick.', false);
     } finally {
@@ -66,17 +62,8 @@ export default function FindScreen() {
     }
   };
 
-  const handleSound = async () => {
-    setPending('sound');
-    try {
-      await api.buzz(FIND_BUZZ_HZ, FIND_BUZZ_MS);
-      flash('Playing sound on the stick…', true);
-    } catch {
-      flash('Could not reach the stick.', false);
-    } finally {
-      setPending(null);
-    }
-  };
+  const handleVibrate = () => handleFind('vibrate');
+  const handleSound = () => handleFind('sound');
 
   return (
     <SafeAreaView style={styles.safe}>

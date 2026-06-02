@@ -123,3 +123,47 @@ class TestEspSpiTelemetry:
     def test_build_command_default_is_all_zero(self) -> None:
         # The all-zero frame is the firmware-ignored "no override" command.
         assert build_command() == bytes(64)
+
+
+class _FakeLink:
+    """SPI link stub returning a scripted sequence of decoded frames.
+
+    Each transfer() pops the next frame; once exhausted it repeats the last.
+    `transfers` counts how many SPI transfers were actually taken.
+    """
+
+    def __init__(self, frames: list[dict[str, Any]]) -> None:
+        self._frames = frames
+        self.transfers = 0
+        self.available = True
+
+    def open(self) -> None: ...
+    def close(self) -> None: ...
+
+    def transfer(self, buzzer_cmd: int = 0, vibrator_cmd: int = 0) -> dict[str, Any] | None:
+        self.transfers += 1
+        idx = min(self.transfers - 1, len(self._frames) - 1)
+        return self._frames[idx]
+
+
+class TestTelemetryCoherence:
+    """The shared telemetry sensor must serve one coherent latest frame to
+    all readers — otherwise a one-shot flag like sos_active could be
+    consumed by one polling thread and missed by the SOS watcher."""
+
+    def test_reads_within_window_share_one_transfer(self) -> None:
+        from sensors.stick_telemetry import StickTelemetrySensor
+
+        sos_frame = {"sos_active": True, "lidar_distance_m": None, "seq": 1}
+        plain_frame = {"sos_active": False, "lidar_distance_m": None, "seq": 2}
+        link = _FakeLink([sos_frame, plain_frame])
+        sensor = StickTelemetrySensor(link=link)  # type: ignore[arg-type]
+        sensor.initialize()
+
+        first = sensor.read()
+        second = sensor.read()  # immediately after — inside coherence window
+
+        # Only one SPI transfer happened, and both readers saw the SOS frame.
+        assert link.transfers == 1
+        assert first.data["sos_active"] is True
+        assert second.data["sos_active"] is True

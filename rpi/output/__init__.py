@@ -2,7 +2,7 @@
 
 from output.buzzer import BuzzerController
 from output.haptics import HapticsController
-from output.output_queue import OutputCommand, OutputQueue
+from output.output_queue import OutputCommand, OutputQueue, SpeechChannel
 from output.speaker import SpeakerController
 
 __all__ = [
@@ -10,5 +10,6 @@ __all__ = [
     "HapticsController",
     "OutputCommand",
     "OutputQueue",
+    "SpeechChannel",
     "SpeakerController",
 ]

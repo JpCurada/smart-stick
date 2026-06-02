@@ -21,7 +21,9 @@ export const API_BASE_URL: string =
 
 export const POLL_INTERVALS = {
   location: 5_000,
-  status: 30_000,
+  // Home polls /api/status for the SOS banner — keep this short so an SOS
+  // press surfaces within a few seconds, not up to half a minute.
+  status: 3_000,
   detections: 5_000,
   cameraFrame: 1_000,
   navigationLog: 4_000,

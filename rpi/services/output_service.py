@@ -16,7 +16,9 @@ from output import (
     OutputCommand,
     OutputQueue,
     SpeakerController,
+    SpeechChannel,
 )
+from sensors.esp32_spi import Esp32SpiLink
 from storage import CommandRecord, CommandRepository, MessageRecord, MessageRepository
 from utils.converters import now_utc
 from utils.logger import get_logger
@@ -25,6 +27,20 @@ from utils.logger import get_logger
 # Matches the firmware override pattern so the cane keeps buzzing/vibrating
 # for the full window without competing detection commands interleaving.
 FIND_MY_STICK_BLOCK_SECONDS = 30.0
+
+# How long the cane actively buzzes + vibrates for one Find press, and how
+# often the RPi re-asserts the override. The ESP32 re-runs its own buzzer /
+# vibrator self-update every firmware loop and would cancel a one-shot
+# override on the very next loop, so the RPi must re-send the command faster
+# than the firmware loops (~tens of ms) to keep the cane alerting.
+FIND_ALERT_DURATION_S = 2.0
+FIND_REASSERT_INTERVAL_S = 0.03
+
+# Combined Find override frame: drop-pattern buzzer + vibrator on. Sent as a
+# single SPI command so neither output cancels the other (a buzz-only frame
+# carries vibrator_cmd=0 and vice-versa).
+_FIND_BUZZER_CMD = 1  # BUZZER_DROP
+_FIND_VIBRATOR_CMD = 1  # vibrator on
 
 
 def _command_id(prefix: str) -> str:
@@ -42,11 +58,24 @@ class OutputService:
         queue: OutputQueue,
         command_repo: CommandRepository,
         message_repo: MessageRepository | None = None,
+        speech_channel: SpeechChannel | None = None,
+        link: Esp32SpiLink | None = None,
     ) -> None:
         self._haptics = haptics
         self._buzzer = buzzer
         self._speaker = speaker
         self._queue = queue
+        # Shared SPI link, used directly only by Find My Stick, which must
+        # re-assert a COMBINED buzz+vibrate frame repeatedly (see find_my_stick).
+        self._link = link
+        self._find_thread: threading.Thread | None = None
+        self._find_stop = threading.Event()
+        # Speech runs on its own single-slot channel, NOT the shared feedback
+        # queue — so guardian/LSTM/detection speech is never queued behind or
+        # dropped by the flood of detection vibrate/buzz commands ("output
+        # queue full"). The channel is started lazily on first speak().
+        self._speech = speech_channel if speech_channel is not None else SpeechChannel()
+        self._speech_started = False
         self._commands = command_repo
         self._messages = message_repo
         self._log = get_logger("services.output")
@@ -70,6 +99,13 @@ class OutputService:
     def set_sos_active_getter(self, getter: Callable[[], bool]) -> None:
         """Wire in a callable returning True while the SOS button is held."""
         self._sos_active_getter = getter
+
+    def stop(self) -> None:
+        """Stop the speech channel and any Find alert. Called on shutdown."""
+        self._stop_find_thread()
+        if self._speech_started:
+            self._speech.stop()
+            self._speech_started = False
 
     def feedback_suppressed(self) -> bool:
         """True when SOS is held OR the Find My Stick window is still open."""
@@ -220,7 +256,12 @@ class OutputService:
                     estimated_speak_time_ms=self._speaker.estimate_duration_ms(text),
                 )
             )
-        self._queue.submit(OutputCommand(action=action, name="speak"))
+        # Speech goes on its dedicated single-slot channel, never the shared
+        # feedback queue — so it cannot be dropped by "output queue full".
+        if not self._speech_started:
+            self._speech.start()
+            self._speech_started = True
+        self._speech.submit(OutputCommand(action=action, name="speak"))
         return message_id
 
     def emergency_sos(self) -> str:
@@ -229,21 +270,59 @@ class OutputService:
     def find_my_stick(self) -> str:
         """Buzz + vibrate the cane so a sighted helper can locate it.
 
-        Opens a FIND_MY_STICK_BLOCK_SECONDS window during which detection
+        The ESP32 re-runs its own buzzer/vibrator self-update every firmware
+        loop and cancels a one-shot RPi override on the very next loop, so a
+        single command produces at most an inaudible blip. Instead we run a
+        short-lived thread that re-asserts a COMBINED buzz+vibrate frame every
+        FIND_REASSERT_INTERVAL_S for FIND_ALERT_DURATION_S — faster than the
+        firmware loops — so the cane keeps alerting for the full window.
+
+        Also opens a FIND_MY_STICK_BLOCK_SECONDS window during which detection
         haptics + buzzer are suppressed (see feedback_suppressed). Earpiece
         TTS is unaffected — guardian messages still come through.
         """
         command_id = _command_id("cmd_find")
-        params = {"buzzer_cmd": 1, "vibrator_cmd": 1, "name": "find_my_stick"}
+        params = {
+            "buzzer_cmd": _FIND_BUZZER_CMD,
+            "vibrator_cmd": _FIND_VIBRATOR_CMD,
+            "duration_s": FIND_ALERT_DURATION_S,
+            "name": "find_my_stick",
+        }
         self._find_active_until = time.monotonic() + FIND_MY_STICK_BLOCK_SECONDS
 
-        def action() -> None:
-            buzzer_ok = self._buzzer.play_tone(BUZZER_TONES["standard_alert"])
-            haptics_ok = self._haptics.vibrate(intensity=255, duration_ms=500)
-            self._record(command_id, "find_my_stick", params, buzzer_ok and haptics_ok)
+        # Cancel any in-flight Find so a new press restarts cleanly.
+        self._stop_find_thread()
+        self._find_stop.clear()
+        self._find_thread = threading.Thread(
+            target=self._run_find_alert, name="find-my-stick", daemon=True
+        )
+        self._find_thread.start()
 
-        self._queue.submit(OutputCommand(action=action, name="find_my_stick"))
+        self._record(command_id, "find_my_stick", params, self._link is not None)
         return command_id
+
+    def _run_find_alert(self) -> None:
+        """Re-assert the combined Find override until the duration elapses."""
+        if self._link is None:
+            # No hardware link (dev/test) — nothing to drive.
+            self._log.info(
+                "find(no link) buzz=%d vib=%d for %.1fs",
+                _FIND_BUZZER_CMD,
+                _FIND_VIBRATOR_CMD,
+                FIND_ALERT_DURATION_S,
+            )
+            return
+        deadline = time.monotonic() + FIND_ALERT_DURATION_S
+        while not self._find_stop.is_set() and time.monotonic() < deadline:
+            self._link.send_command(buzzer_cmd=_FIND_BUZZER_CMD, vibrator_cmd=_FIND_VIBRATOR_CMD)
+            time.sleep(FIND_REASSERT_INTERVAL_S)
+
+    def _stop_find_thread(self) -> None:
+        self._find_stop.set()
+        thread = self._find_thread
+        if thread is not None and thread.is_alive() and thread is not threading.current_thread():
+            thread.join(timeout=FIND_ALERT_DURATION_S + 0.5)
+        self._find_thread = None
 
     def _record(
         self,
