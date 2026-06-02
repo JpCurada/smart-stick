@@ -3,7 +3,6 @@
 from storage.database import Database
 from storage.models import (
     AlertRecord,
-    BatteryRecord,
     CommandRecord,
     DetectionRecord,
     ElectricalRecord,
@@ -13,7 +12,6 @@ from storage.models import (
 )
 from storage.repositories import (
     AlertRepository,
-    BatteryRepository,
     CommandRepository,
     DetectionRepository,
     ElectricalRepository,
@@ -25,7 +23,6 @@ from storage.repositories import (
 __all__ = [
     "Database",
     "AlertRecord",
-    "BatteryRecord",
     "CommandRecord",
     "DetectionRecord",
     "ElectricalRecord",
@@ -33,7 +30,6 @@ __all__ = [
     "MessageRecord",
     "SessionRecord",
     "AlertRepository",
-    "BatteryRepository",
     "CommandRepository",
     "DetectionRepository",
     "ElectricalRepository",

@@ -6,11 +6,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from services.battery_service import BatteryService
 from services.message_service import MessageService
 from services.session_service import SessionService
 from storage import (
-    BatteryRepository,
     MessageRepository,
     SessionRepository,
 )
@@ -45,70 +43,6 @@ class TestSessionService:
         summary = service.end()
         assert summary is not None
         assert summary["detection_count"] == 5
-
-
-class TestBatteryService:
-    def test_warnings_fire_at_each_threshold(self, database) -> None:
-        sensor = MagicMock()
-        sensor.initialize.return_value = None
-        sensor.read.side_effect = self._make_readings([45, 24, 8])
-
-        warnings: list[tuple[str, object]] = []
-
-        def on_warning(message: str, tone) -> None:
-            warnings.append((message, tone))
-
-        service = BatteryService(
-            sensor=sensor,
-            repository=BatteryRepository(database),
-            on_warning=on_warning,
-            interval_s=0,
-        )
-        # Call internal tick directly to avoid spinning up threads.
-        service._tick()
-        service._tick()
-        service._tick()
-
-        triggered_levels = [w[0] for w in warnings]
-        assert any("50" in m for m in triggered_levels)
-        assert any("25" in m for m in triggered_levels)
-        assert any("10" in m for m in triggered_levels)
-
-    def test_warning_fires_only_once_per_threshold(self, database) -> None:
-        sensor = MagicMock()
-        sensor.read.side_effect = self._make_readings([45, 44, 43])
-        warnings: list = []
-        service = BatteryService(
-            sensor=sensor,
-            repository=BatteryRepository(database),
-            on_warning=lambda m, t: warnings.append(m),
-            interval_s=0,
-        )
-        service._tick()
-        service._tick()
-        service._tick()
-        # Only one "50%" warning even though three readings crossed the threshold.
-        fifty_warnings = [w for w in warnings if "50" in w]
-        assert len(fifty_warnings) == 1
-
-    @staticmethod
-    def _make_readings(percentages: list[int]) -> list[MagicMock]:
-        readings = []
-        for pct in percentages:
-            r = MagicMock()
-            r.healthy = True
-            r.data = {
-                "voltage_v": 3.5 + pct / 100.0 * 0.7,
-                "current_ma": 2000,
-                "percentage": pct,
-                "temperature_c": 35.0,
-                "health": "warning" if pct < 80 else "good",
-            }
-            from utils.converters import now_utc
-
-            r.timestamp = now_utc()
-            readings.append(r)
-        return readings
 
 
 class TestMessageService:

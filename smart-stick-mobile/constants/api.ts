@@ -21,7 +21,7 @@ export const API_BASE_URL: string =
 
 export const POLL_INTERVALS = {
   location: 5_000,
-  battery: 30_000,
+  status: 30_000,
   detections: 5_000,
   cameraFrame: 1_000,
   navigationLog: 4_000,

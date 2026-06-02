@@ -63,41 +63,6 @@ class FakeGps:
 
 
 # ---------------------------------------------------------------------------
-# Fake Battery — drains from 100 % over ~4 hours
-# ---------------------------------------------------------------------------
-
-class FakeBattery:
-    """Simulates a 10 Ah Li-Ion pack draining at ~2.5 A."""
-
-    name = "battery"
-    _DRAIN_PCT_PER_S = 100.0 / (4 * 3600)   # 100 % in 4 h
-
-    def initialize(self) -> None: ...
-    def is_healthy(self) -> bool: return True
-    def close(self) -> None: ...
-
-    def read(self) -> object:
-        from core.types import SensorReading
-        from utils.converters import now_utc
-
-        pct = max(0, 100 - _elapsed() * self._DRAIN_PCT_PER_S)
-        voltage = 3.3 + (4.2 - 3.3) * pct / 100.0
-        health = "good" if pct > 80 else ("warning" if pct > 20 else "critical")
-        return SensorReading(
-            sensor_name=self.name,
-            timestamp=now_utc(),
-            data={
-                "voltage_v": round(voltage, 3),
-                "current_ma": 2500,
-                "percentage": int(pct),
-                "temperature_c": round(_drift(38.0, 3.0, period_s=300), 1),
-                "health": health,
-            },
-            healthy=True,
-        )
-
-
-# ---------------------------------------------------------------------------
 # Fake LIDAR — oscillates between 0.5 m and 4 m to simulate walking
 # ---------------------------------------------------------------------------
 
@@ -167,16 +132,6 @@ class FakeEsp32Bridge:
 
     def send_buzz(self, frequency_hz: int, duration_ms: int) -> bool:
         return True
-
-    def request_battery_status(self) -> dict[str, Any]:
-        pct = max(0, 100 - _elapsed() * FakeBattery._DRAIN_PCT_PER_S)
-        v = 3.3 + (4.2 - 3.3) * pct / 100.0
-        return {
-            "voltage_v": round(v, 3),
-            "current_ma": 2500,
-            "percentage": int(pct),
-            "temperature_c": 38.0,
-        }
 
     def read(self) -> object:
         from core.types import SensorReading

@@ -3,19 +3,8 @@
  * Source of truth: rpi/api/routes.py and rpi/api/schemas.py.
  */
 
-export type HealthStatus = 'good' | 'warning' | 'critical';
 export type AlertSeverity = 'low' | 'medium' | 'high' | 'critical';
 export type MessagePriority = 'low' | 'normal' | 'high';
-
-export interface BatteryStatus {
-  percentage: number;
-  voltage: number;
-  current: number | null;
-  health: HealthStatus;
-  runtime_minutes: number | null;
-  temperature_c: number | null;
-  timestamp: string;
-}
 
 export interface LocationFix {
   latitude: number | null;
@@ -91,7 +80,6 @@ export interface SosEvent {
 }
 
 export interface StatusResponse {
-  battery: BatteryStatus | null;
   location: LocationFix | null;
   session: SessionSnapshot | null;
   detection: {

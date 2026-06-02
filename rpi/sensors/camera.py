@@ -14,7 +14,7 @@ from typing import Any
 from core.config import Config
 from sensors.base import SensorBase
 
-try:  # libcamera colour conversion only; never required for capture.
+try:  # used only for frame rotation; never required for capture.
     import cv2  # type: ignore[import-not-found]
 
     _CV2_AVAILABLE = True
@@ -84,14 +84,32 @@ class CameraSensor(SensorBase):
         self._require(self._picam is not None, "camera not initialized")
         frame = self._picam.capture_array()
         self._require(frame is not None, "frame grab failed")
-        # Picamera2 delivers RGB; OpenCV / YOLO drawing expects BGR.
-        if _CV2_AVAILABLE:
-            frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+        # Picamera2's "RGB888" format actually delivers channels in BGR order,
+        # which is exactly what OpenCV / YOLO drawing / cv2.imencode expect —
+        # so no colour conversion is needed. (Converting here swapped R and B
+        # and made the served frame look blue.)
+        frame = self._apply_rotation(frame)
+        rotated_90 = Config.CAMERA_ROTATION in (90, 270)
         return {
             "frame": frame,
-            "width": self._width,
-            "height": self._height,
+            # Width/height swap when rotated a quarter turn.
+            "width": self._height if rotated_90 else self._width,
+            "height": self._width if rotated_90 else self._height,
         }
+
+    @staticmethod
+    def _apply_rotation(frame: Any) -> Any:
+        """Rotate the captured frame clockwise per Config.CAMERA_ROTATION."""
+        rotation = Config.CAMERA_ROTATION
+        if rotation == 0 or not _CV2_AVAILABLE:
+            return frame
+        codes = {
+            90: cv2.ROTATE_90_CLOCKWISE,
+            180: cv2.ROTATE_180,
+            270: cv2.ROTATE_90_COUNTERCLOCKWISE,
+        }
+        code = codes.get(rotation)
+        return cv2.rotate(frame, code) if code is not None else frame
 
     def _close_impl(self) -> None:
         if self._picam is not None:

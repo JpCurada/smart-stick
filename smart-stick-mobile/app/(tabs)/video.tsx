@@ -16,7 +16,7 @@ import { usePoll } from '@/hooks/use-poll';
 import { api } from '@/lib/api';
 import type { DetectionDto } from '@/lib/types';
 
-const RECOGNITION_LOG_LIMIT = 30;
+const RECOGNITION_LOG_LIMIT = 10;
 
 type RecognitionLogEntry = DetectionDto & { key: string };
 

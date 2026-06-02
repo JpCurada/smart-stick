@@ -23,9 +23,11 @@ class SpeakerController:
         self,
         rate_wpm: int | None = None,
         volume: float | None = None,
+        voice: str | None = None,
     ) -> None:
         self._rate_wpm = rate_wpm if rate_wpm is not None else Config.TTS_RATE_WPM
         self._volume = volume if volume is not None else Config.TTS_VOLUME
+        self._voice = voice if voice is not None else Config.TTS_VOICE
         self._engine: Any = None
         self._log = get_logger("output.speaker")
         self._init_engine()
@@ -41,6 +43,15 @@ class SpeakerController:
             self._engine = pyttsx3.init()
             self._engine.setProperty("rate", self._rate_wpm)
             self._engine.setProperty("volume", self._volume)
+            if self._voice:
+                try:
+                    self._engine.setProperty("voice", self._voice)
+                except Exception as exc:
+                    # Voice id not available on this Pi — leave the default.
+                    # Use `espeak-ng --voices` to list valid ids.
+                    self._log.warning(
+                        "TTS voice '%s' unavailable, using OS default: %s", self._voice, exc
+                    )
         except Exception as exc:
             self._log.warning("pyttsx3 init failed: %s", exc)
             self._engine = None

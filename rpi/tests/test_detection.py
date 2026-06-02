@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+from unittest.mock import MagicMock
+
 from core.types import AlertSeverity, Detection, ObjectClass
-from detection.alert_engine import AlertEngine
-from detection.distance_fusion import fuse_distance
+from detection.alert_engine import AlertDecision, AlertEngine
+from detection.distance_fusion import fuse_distance, fuse_distance_with_source
 from detection.patterns import pattern_for_object
 from detection.rate_limiter import RateLimiter
 from detection.tones import tone_for_alert
+from services.detection_service import DetectionService
 
 
 class TestRateLimiter:
@@ -57,6 +60,84 @@ class TestDistanceFusion:
 
     def test_returns_none_when_all_invalid(self) -> None:
         assert fuse_distance(None, None, None) is None
+
+    def test_source_is_lidar_when_lidar_in_range(self) -> None:
+        assert fuse_distance_with_source(camera_distance_m=5.0, lidar_distance_m=2.0) == (
+            2.0,
+            "lidar",
+        )
+
+    def test_source_is_camera_when_only_camera(self) -> None:
+        assert fuse_distance_with_source(camera_distance_m=4.5, lidar_distance_m=None) == (
+            4.5,
+            "camera",
+        )
+
+    def test_source_is_none_when_all_invalid(self) -> None:
+        assert fuse_distance_with_source(None, None, None) == (None, None)
+
+
+class TestDispatchMotorOwnership:
+    """The firmware owns the motor for forward LiDAR obstacles; the RPi must
+    suppress its own vibration only in that case to avoid double-driving."""
+
+    def _service(self) -> tuple[DetectionService, MagicMock]:
+        output = MagicMock()
+        loop = MagicMock()
+        service = DetectionService(
+            loop=loop,
+            alert_engine=MagicMock(),
+            output=output,
+            detection_repo=MagicMock(),
+            alert_repo=MagicMock(),
+        )
+        return service, output
+
+    @staticmethod
+    def _decision() -> AlertDecision:
+        return AlertDecision(
+            triggered=True,
+            severity=AlertSeverity.HIGH,
+            vibration=pattern_for_object(ObjectClass.PERSON),
+            tone=tone_for_alert(ObjectClass.PERSON),
+            speak_text="person ahead",
+        )
+
+    def test_lidar_obstacle_suppresses_rpi_vibration(self) -> None:
+        service, output = self._service()
+        det = Detection(
+            object_class=ObjectClass.PERSON,
+            confidence=0.9,
+            distance_m=1.5,
+            distance_source="lidar",
+        )
+        service._dispatch(det, self._decision())
+        output.play_vibration_pattern.assert_not_called()
+        # Buzzer + voice still fire — only the motor is the firmware's job.
+        output.play_tone.assert_called_once()
+        output.speak.assert_called_once()
+
+    def test_camera_only_obstacle_still_vibrates(self) -> None:
+        service, output = self._service()
+        det = Detection(
+            object_class=ObjectClass.PERSON,
+            confidence=0.9,
+            distance_m=1.5,
+            distance_source="camera",
+        )
+        service._dispatch(det, self._decision())
+        output.play_vibration_pattern.assert_called_once()
+
+    def test_ultrasonic_overhead_still_vibrates(self) -> None:
+        service, output = self._service()
+        det = Detection(
+            object_class=ObjectClass.OVERHEAD,
+            confidence=1.0,
+            distance_m=0.5,
+            distance_source="ultrasonic",
+        )
+        service._dispatch(det, self._decision())
+        output.play_vibration_pattern.assert_called_once()
 
 
 class TestPatternsAndTones:

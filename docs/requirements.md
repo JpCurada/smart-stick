@@ -1,4 +1,4 @@
-# Smart Stick for BVI - Requirements Document v1.1
+# Smart Stick for BVI - Requirements Document v1.1+
 
 ---
 
@@ -20,7 +20,6 @@
 - Caregiver app shows live location within 10 seconds
 - Distinct vibration patterns for different obstacles (user can distinguish via haptic feedback)
 - Distinct buzzer tones for different alerts (user can distinguish via audio feedback)
-- Battery warnings at 50%, 25%, 10% via voice announcements
 - User confidence rating >4/5 after 30-minute walk
 
 ---
@@ -149,24 +148,11 @@ Priority: CRITICAL
 Effort: 8 points
 ```
 
-#### **US-007: Monitor Battery Status with Voice Warnings**
+#### **US-007: Monitor Battery Status with Voice Warnings** — REMOVED
 ```
-As a blind person using the stick,
-I want to know battery status through voice announcements,
-So that I don't run out of power mid-journey.
-
-Acceptance Criteria:
-- [ ] Voice alert at 50% battery: "Battery at 50 percent"
-- [ ] Voice alert at 25% battery: "Battery at 25 percent. Consider charging."
-- [ ] Voice alert at 10% battery: "Battery critically low at 10 percent"
-- [ ] Buzzer accompanies each warning (distinct 800 Hz tone)
-- [ ] Announcements clear and easy to understand
-- [ ] Can hear warnings over ambient noise
-- [ ] No repeated announcements for same level (only once per threshold)
-- [ ] Graceful shutdown at 2% (no data loss)
-
-Priority: MEDIUM
-Effort: 5 points
+REMOVED: Battery monitoring and the associated voice warnings have been
+dropped from the product. The stick no longer reads battery telemetry,
+announces battery levels, or exposes a battery API/screen.
 ```
 
 #### **US-008: Receive Audio Through Earpiece**
@@ -182,7 +168,6 @@ Acceptance Criteria:
 - [ ] Vibration motor still works independently
 - [ ] Object detection sounds play in earpiece
 - [ ] TTS messages play in earpiece
-- [ ] Battery warnings play in earpiece
 - [ ] Works with mono or stereo earpieces
 - [ ] No audio delays or lag
 
@@ -290,23 +275,11 @@ Priority: MEDIUM
 Effort: 5 points
 ```
 
-#### **US-105: Monitor Battery Status**
+#### **US-105: Monitor Battery Status** — REMOVED
 ```
-As a caregiver,
-I want to see the stick's battery percentage,
-So that I know if it needs charging.
-
-Acceptance Criteria:
-- [ ] Mobile app displays battery %
-- [ ] Shows health status (good, warning, critical)
-- [ ] Estimated runtime remaining shown
-- [ ] Alert if battery <20%
-- [ ] Updates every 30 seconds
-- [ ] Historical battery trend (last 24 hours)
-- [ ] Shows voltage reading
-
-Priority: MEDIUM
-Effort: 4 points
+REMOVED: The caregiver battery view has been dropped. The mobile app no
+longer displays battery percentage, health, runtime, or trend, and the
+backend no longer exposes battery data.
 ```
 
 #### **US-106: Emergency SOS Response**
@@ -453,14 +426,12 @@ Effort: 8 points
 - [x] Distinct audio tones (5+ frequencies)
 - [x] Overhead obstacle detection
 - [x] Stair/elevation detection (up and down)
-- [x] Battery warnings (50%, 25%, 10%) via voice
 - [x] GPS location tracking (every 5s)
 - [x] Mobile app with 5 tabs
 - [x] Real-time location on Google Maps
 - [x] Quick message sending (6 templates)
 - [x] Custom message sending (TTS)
 - [x] Find my stick (vibrate/sound remote)
-- [x] Battery percentage display in app
 - [x] 3+ hours battery life
 - [x] Offline-first operation (no internet required)
 - [x] Works on same WiFi network
@@ -493,7 +464,7 @@ Effort: 8 points
 - API response time: <200ms (local WiFi)
 - Battery life: 3-4 hours minimum
 - Frame rate: 5-6 FPS on RPi 5 CPU
-- Update frequency: GPS every 5s, battery every 30s
+- Update frequency: GPS every 5s
 - Vibration response: <100ms from trigger
 
 ### **Reliability**

@@ -33,17 +33,6 @@ class LocationRecord(BaseModel):
     dwell_time_minutes: int | None = None
 
 
-class BatteryRecord(BaseModel):
-    timestamp: datetime
-    unix_ts: int
-    voltage: float
-    current: int | None = None
-    percentage: int = Field(ge=0, le=100)
-    temperature: float | None = None
-    health_status: str
-    status_json: str
-
-
 class CommandRecord(BaseModel):
     command_id: str
     timestamp: datetime
@@ -90,9 +79,6 @@ class SessionRecord(BaseModel):
 
 class ElectricalRecord(BaseModel):
     timestamp: datetime
-    battery_voltage_v: float
-    battery_current_ma: int | None = None
-    battery_percentage: int | None = None
     rpi_temp_c: float | None = None
     esp32_temp_c: float | None = None
     wifi_signal_strength_db: int | None = None
@@ -106,7 +92,6 @@ class ElectricalRecord(BaseModel):
 __all__ = [
     "DetectionRecord",
     "LocationRecord",
-    "BatteryRecord",
     "CommandRecord",
     "MessageRecord",
     "AlertRecord",

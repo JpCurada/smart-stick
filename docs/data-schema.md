@@ -108,46 +108,12 @@ address: "Paterno St, Quezon City"
 
 ---
 
-### **2.3 BATTERY_STATUS Table**
+### **2.3 BATTERY_STATUS Table** — REMOVED
 
-**Purpose:** Track battery voltage, current, health over time
-
-**Fields:**
-
-| Field | Type | Constraints | Description |
-|-------|------|-----------|-------------|
-| id | INTEGER | PRIMARY KEY AUTO | Auto-incrementing ID |
-| timestamp | DATETIME | NOT NULL | When reading was taken |
-| unix_ts | INTEGER | NOT NULL (INDEXED) | Unix timestamp |
-| voltage | REAL | NOT NULL | Battery voltage in volts (0-5V) |
-| current | INTEGER | NULL | Current in milliamps (0-3000mA) |
-| percentage | INTEGER | 0-100 (INDEXED) | Battery percentage |
-| temperature | REAL | NULL | Battery temperature in Celsius |
-| health_status | TEXT | good/warning/critical | Battery health assessment |
-| status_json | TEXT | NOT NULL | Complete status object |
-| created_at | DATETIME | DEFAULT NOW | Record creation time |
-
-**Health Status Rules:**
-- Good: >80% percentage, voltage 4.5-5V, temp <45°C
-- Warning: 20-80% percentage, voltage 3.5-4.5V, temp 45-55°C
-- Critical: <20% percentage, voltage <3.5V, temp >55°C
-
-**Example Record:**
-```
-timestamp: "2024-05-06T12:00:00.000Z"
-voltage: 4.8
-current: 2100
-percentage: 85
-temperature: 42.5
-health_status: "good"
-status_json: {
-  "voltage_v": 4.8,
-  "current_ma": 2100,
-  "percentage": 85,
-  "health": "good",
-  "estimated_runtime_minutes": 185
-}
-```
+> Battery monitoring has been removed. The `battery_status` table, the
+> `/api/battery` endpoint, the battery voice warnings, and the mobile
+> battery view no longer exist. This section is retained only as a record
+> that the capability once existed.
 
 **Retention:** 7 days rolling
 **Update Frequency:** Every 30 seconds
@@ -410,9 +376,6 @@ uptime_seconds: 86400
 |-------|------|-----------|-------------|
 | id | INTEGER | PRIMARY KEY AUTO | Auto-incrementing ID |
 | timestamp | DATETIME | NOT NULL (INDEXED) | When logged |
-| battery_voltage_v | REAL | NOT NULL | Battery voltage |
-| battery_current_ma | INTEGER | NULL | Current consumption |
-| battery_percentage | INTEGER | 0-100 | Battery % |
 | rpi_temp_c | REAL | NULL | RPi CPU temperature |
 | esp32_temp_c | REAL | NULL | ESP32 temperature |
 | wifi_signal_strength_db | INTEGER | NULL | WiFi signal (-100 to 0 dBm) |
@@ -428,9 +391,6 @@ uptime_seconds: 86400
 **Example Record:**
 ```
 timestamp: "2024-05-06T12:00:00.000Z"
-battery_voltage_v: 4.8
-battery_current_ma: 2100
-battery_percentage: 85
 rpi_temp_c: 42.5
 esp32_temp_c: 38.2
 wifi_signal_strength_db: -45
@@ -626,9 +586,9 @@ notes                   String      Additional notes
 
 **CSV Headers:**
 ```
-timestamp,battery_voltage_v,battery_current_ma,battery_percentage,
-rpi_temp_c,esp32_temp_c,wifi_signal_strength_db,detection_fps,
-inference_time_ms,memory_usage_mb,uptime_seconds
+timestamp,rpi_temp_c,esp32_temp_c,esp32_voltage_v,esp32_current_ma,
+wifi_signal_strength_db,detection_fps,inference_time_ms,memory_usage_mb,
+uptime_seconds
 ```
 
 **Example Rows:**

@@ -17,7 +17,7 @@ from collections.abc import Callable
 
 from core.config import Config
 from core.types import Detection, ObjectClass
-from detection.distance_fusion import fuse_distance
+from detection.distance_fusion import fuse_distance_with_source
 from detection.frame_buffer import FrameBuffer
 from detection.yolo_model import YoloDetector, YoloPrediction
 from sensors import CameraSensor, StickTelemetrySensor
@@ -192,7 +192,7 @@ class DetectionLoop:
         prediction: YoloPrediction,
         lidar_distance_m: float | None,
     ) -> Detection:
-        fused = fuse_distance(
+        fused, source = fuse_distance_with_source(
             camera_distance_m=prediction.distance_estimate_m,
             lidar_distance_m=lidar_distance_m,
         )
@@ -201,6 +201,7 @@ class DetectionLoop:
             confidence=prediction.confidence,
             distance_m=fused if fused is not None else 99.0,
             bbox=prediction.bbox,
+            distance_source=source,
         )
 
     def _read_telemetry(self) -> dict[str, object] | None:
@@ -213,12 +214,16 @@ class DetectionLoop:
         return reading.data
 
     def _synthetic_detection(self, object_class: ObjectClass, distance_m: float) -> Detection:
+        # Overhead / drop come from the firmware's ultrasonic flags, which the
+        # firmware buzzes but does NOT vibrate for — so the RPi keeps driving
+        # vibration here (source is not the forward LiDAR motor path).
         return Detection(
             object_class=object_class,
             confidence=1.0,
             distance_m=distance_m,
             bbox=None,
             timestamp=now_utc(),
+            distance_source="ultrasonic",
         )
 
     def _sleep_for_target_fps(self, loop_start: float) -> None:

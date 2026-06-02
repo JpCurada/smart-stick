@@ -50,14 +50,17 @@ class OutputService:
         self._commands = command_repo
         self._messages = message_repo
         self._log = get_logger("services.output")
-        # Speech preemption bookkeeping. _pending holds (priority, cancel_event)
-        # for every speak command currently in the queue. A higher-priority
-        # speak() sets the cancel_event on each lower-priority pending item
-        # so the queue worker skips it, then calls speaker.stop() to cut off
-        # whatever is mid-utterance.
+        # Earpiece is a single live slot — strict hierarchy, never a queue.
+        # At most one utterance is "current" at a time. A new speak() either:
+        #   • plays now (its tier >= the current tier) — interrupting the
+        #     current utterance, including a same-tier one (newest wins); or
+        #   • is dropped immediately (a strictly higher tier is current).
+        # We never buffer speech: lower/late items vanish, they do not wait.
+        # `_speech_generation` is bumped on every accepted speak so a stale
+        # queued action knows it has been superseded and skips playing.
         self._speech_lock = threading.Lock()
-        self._pending_speech: list[tuple[SpeechPriority, threading.Event]] = []
         self._active_speech_priority: SpeechPriority | None = None
+        self._speech_generation = 0
         # Find My Stick suppression window. SOS suppression is checked via
         # _sos_active_getter (set by the container) so we don't take a hard
         # dep on SosService here.
@@ -166,40 +169,42 @@ class OutputService:
         """
         message_id = _command_id("msg")
         params = {"text": text, "priority": priority, "source": source.value}
-        cancel = threading.Event()
         speech_priority = source
 
-        # Preempt anything strictly lower priority. Cancel pending items so
-        # the queue worker skips them; stop the speaker so any utterance
-        # mid-flight is cut off and the guardian message is heard immediately.
-        preempted_active = False
+        # Strict hierarchy, single live slot — no queue. Drop the newcomer
+        # only if a STRICTLY higher tier is currently speaking. Otherwise it
+        # wins: equal-or-higher tier interrupts whatever is live (newest wins
+        # at equal tier). `my_gen` lets the queued action detect that an even
+        # newer speak superseded it before it got a turn.
         with self._speech_lock:
-            for pending_priority, pending_cancel in self._pending_speech:
-                if pending_priority.rank > speech_priority.rank:
-                    pending_cancel.set()
-            if (
-                self._active_speech_priority is not None
-                and self._active_speech_priority.rank > speech_priority.rank
-            ):
-                preempted_active = True
-            self._pending_speech.append((speech_priority, cancel))
+            active = self._active_speech_priority
+            if active is not None and speech_priority.rank > active.rank:
+                self._log.debug(
+                    "speech %s (%s) dropped — %s is speaking",
+                    message_id,
+                    speech_priority.value,
+                    active.value,
+                )
+                return message_id
+            self._speech_generation += 1
+            my_gen = self._speech_generation
+            self._active_speech_priority = speech_priority
 
-        if preempted_active:
-            self._speaker.stop()
+        # Interrupt whatever is mid-utterance so the winner is heard at once.
+        self._speaker.stop()
 
         def action() -> None:
-            if cancel.is_set():
-                self._log.debug("speech %s preempted before play", message_id)
-                self._unregister_pending(speech_priority, cancel)
-                return
             with self._speech_lock:
-                self._active_speech_priority = speech_priority
+                if my_gen != self._speech_generation:
+                    # A newer speak() superseded this one before it played.
+                    self._log.debug("speech %s superseded before play", message_id)
+                    return
             try:
                 ok = self._speaker.speak(text, priority=priority)
             finally:
                 with self._speech_lock:
-                    self._active_speech_priority = None
-                self._unregister_pending(speech_priority, cancel)
+                    if my_gen == self._speech_generation:
+                        self._active_speech_priority = None
             self._record(message_id, "speak", params, ok)
             if self._messages is not None and ok:
                 self._messages.mark_delivered(message_id)
@@ -217,13 +222,6 @@ class OutputService:
             )
         self._queue.submit(OutputCommand(action=action, name="speak"))
         return message_id
-
-    def _unregister_pending(self, priority: SpeechPriority, cancel: threading.Event) -> None:
-        with self._speech_lock:
-            try:
-                self._pending_speech.remove((priority, cancel))
-            except ValueError:
-                pass
 
     def emergency_sos(self) -> str:
         return self.play_tone(BUZZER_TONES["emergency_sos"], source="system")

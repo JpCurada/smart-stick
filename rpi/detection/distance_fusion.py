@@ -17,16 +17,34 @@ def _is_valid(distance: float | None, low: float, high: float) -> bool:
     return distance is not None and low <= distance <= high
 
 
+def fuse_distance_with_source(
+    camera_distance_m: float | None,
+    lidar_distance_m: float | None,
+    ultrasonic_distance_m: float | None = None,
+) -> tuple[float | None, str | None]:
+    """Return the most trusted distance reading and which sensor it came from.
+
+    Source is one of ``"lidar"``, ``"ultrasonic"``, ``"camera"`` or ``None``
+    (no reading). Callers that need to know the source — e.g. to avoid
+    double-driving the motor when the firmware already handles forward LiDAR
+    obstacles — use this; ``fuse_distance`` is the value-only convenience.
+    """
+    if _is_valid(lidar_distance_m, _LIDAR_MIN_M, _LIDAR_MAX_M):
+        return lidar_distance_m, "lidar"
+    if _is_valid(ultrasonic_distance_m, _ULTRASONIC_MIN_M, _ULTRASONIC_MAX_M):
+        return ultrasonic_distance_m, "ultrasonic"
+    if camera_distance_m is not None and camera_distance_m > 0:
+        return camera_distance_m, "camera"
+    return None, None
+
+
 def fuse_distance(
     camera_distance_m: float | None,
     lidar_distance_m: float | None,
     ultrasonic_distance_m: float | None = None,
 ) -> float | None:
     """Return the most trusted distance reading available."""
-    if _is_valid(lidar_distance_m, _LIDAR_MIN_M, _LIDAR_MAX_M):
-        return lidar_distance_m
-    if _is_valid(ultrasonic_distance_m, _ULTRASONIC_MIN_M, _ULTRASONIC_MAX_M):
-        return ultrasonic_distance_m
-    if camera_distance_m is not None and camera_distance_m > 0:
-        return camera_distance_m
-    return None
+    distance, _ = fuse_distance_with_source(
+        camera_distance_m, lidar_distance_m, ultrasonic_distance_m
+    )
+    return distance

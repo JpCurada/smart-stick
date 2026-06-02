@@ -27,7 +27,6 @@ independently.
                                                           ▲
 ┌──────────┐                                              │
 │ GPS      │ ─► LocationService ─────────────────────────┤
-│ Battery  │ ─► BatteryService ──► warning callback ─────┤
 │ Metrics  │ ─► ElectricalLogger ────────────────────────┘
 └──────────┘
 ```
@@ -65,7 +64,6 @@ Following these rules:
 | ------------------- | ---------------------- | -------------------------------- |
 | `detection-loop`    | `DetectionLoop`        | `DETECTION_FPS` (default 6 Hz)  |
 | `location`          | `LocationService`      | `GPS_UPDATE_INTERVAL_S` (5 s)    |
-| `battery`           | `BatteryService`       | `BATTERY_UPDATE_INTERVAL_S` (30 s) |
 | `electrical`        | `ElectricalLogger`     | `ELECTRICAL_LOG_INTERVAL_S` (30 s) |
 | `output-queue`      | `OutputQueue` worker   | Drains FIFO; never blocks producers |
 | Main / uvicorn      | FastAPI                | Per-request                      |

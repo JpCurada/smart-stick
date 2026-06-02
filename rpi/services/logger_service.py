@@ -19,9 +19,6 @@ from utils.logger import get_logger
 
 _CSV_HEADERS = (
     "timestamp",
-    "battery_voltage_v",
-    "battery_current_ma",
-    "battery_percentage",
     "rpi_temp_c",
     "esp32_temp_c",
     "esp32_voltage_v",
@@ -67,14 +64,12 @@ class ElectricalLoggerService:
     def __init__(
         self,
         repository: ElectricalRepository,
-        battery_snapshot: Callable[[], dict | None],
         fps_callback: Callable[[], float],
         inference_ms_callback: Callable[[], int],
         csv_path: Path | None = None,
         interval_s: int | None = None,
     ) -> None:
         self._repo = repository
-        self._battery_snapshot = battery_snapshot
         self._fps = fps_callback
         self._inference_ms = inference_ms_callback
         self._csv_path = csv_path or Config.CSV_LOG_PATH
@@ -110,13 +105,9 @@ class ElectricalLoggerService:
             time.sleep(self._interval_s)
 
     def _sample(self) -> None:
-        battery = self._battery_snapshot() or {}
         ts = now_utc()
         record = ElectricalRecord(
             timestamp=ts,
-            battery_voltage_v=float(battery.get("voltage_v", 0.0)),
-            battery_current_ma=battery.get("current_ma"),
-            battery_percentage=battery.get("percentage"),
             rpi_temp_c=_rpi_cpu_temp_c(),
             esp32_temp_c=None,
             wifi_signal_strength_db=None,
@@ -164,9 +155,6 @@ class ElectricalLoggerService:
                 writer.writerow(
                     [
                         iso_timestamp(record.timestamp),
-                        record.battery_voltage_v,
-                        record.battery_current_ma,
-                        record.battery_percentage,
                         record.rpi_temp_c,
                         record.esp32_temp_c,
                         "",

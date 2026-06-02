@@ -127,7 +127,15 @@ class DetectionService:
             self._metrics.record_obstacle_detection(latency_ms=latency_ms, source=source)
 
     def _dispatch(self, detection: Detection, decision: AlertDecision) -> None:
-        if decision.vibration is not None:
+        # The firmware drives the motor itself for forward LiDAR obstacles
+        # (vibrator_update in the ESP32 loop). Sending our own vibrate for the
+        # same obstacle would double-drive the motor and fight the firmware's
+        # pulse timing, so suppress vibration only when the distance came from
+        # the forward LiDAR. Camera-only objects and ultrasonic overhead/drop
+        # flags (which the firmware buzzes but does NOT vibrate for) still
+        # vibrate from here.
+        firmware_vibrates = detection.distance_source == "lidar"
+        if decision.vibration is not None and not firmware_vibrates:
             self._output.play_vibration_pattern(decision.vibration, source="detection")
         if decision.tone is not None:
             self._output.play_tone(decision.tone, source="detection")

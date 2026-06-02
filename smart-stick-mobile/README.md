@@ -15,7 +15,7 @@ Talks to the FastAPI backend running on the Raspberry Pi (see [`../rpi`](../rpi)
 
 | Tab          | Purpose                                                  | Backend endpoints                                      |
 | ------------ | -------------------------------------------------------- | ------------------------------------------------------ |
-| **Home**     | Online status, battery, detection FPS, distance today    | `GET /api/battery`, `GET /api/status`                  |
+| **Home**     | Online status, detection FPS, distance today             | `GET /api/status`                                      |
 | **Location** | Current GPS fix + accuracy, link out to Google Maps      | `GET /api/location`                                    |
 | **Find**     | Remote vibrate (255 / 500 ms) and SOS sound (2500 Hz)    | `POST /api/vibrate`, `POST /api/emergency/sos`         |
 | **Message**  | 6 quick templates + custom TTS, last 20 messages         | `POST /api/message`, `GET /api/message/history`        |
@@ -74,7 +74,6 @@ smart-stick-mobile/
 │       └── video.tsx          Video
 ├── components/                Reusable UI primitives
 │   ├── action-button.tsx
-│   ├── battery-card.tsx
 │   ├── info-row.tsx
 │   ├── status-badge.tsx
 │   ├── themed-text.tsx

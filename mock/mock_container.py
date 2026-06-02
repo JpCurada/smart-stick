@@ -14,7 +14,6 @@ if str(_RPI) not in sys.path:
     sys.path.insert(0, str(_RPI))
 
 from mock.fake_sensors import (  # noqa: E402
-    FakeBattery,
     FakeCamera,
     FakeEsp32Bridge,
     FakeGps,
@@ -30,9 +29,7 @@ from detection.alert_engine import AlertEngine  # noqa: E402
 from detection.detector import DetectionLoop  # noqa: E402
 from detection.frame_buffer import FrameBuffer  # noqa: E402
 from output import BuzzerController, HapticsController, OutputQueue  # noqa: E402
-from sensors.battery import BatterySensor  # noqa: E402
 from services import (  # noqa: E402
-    BatteryService,
     DetectionService,
     ElectricalLoggerService,
     LocationService,
@@ -42,7 +39,6 @@ from services import (  # noqa: E402
 )
 from storage import (  # noqa: E402
     AlertRepository,
-    BatteryRepository,
     CommandRepository,
     Database,
     DetectionRepository,
@@ -64,7 +60,6 @@ def build_mock_container() -> Container:
 
     detection_repo = DetectionRepository(database)
     location_repo = LocationRepository(database)
-    battery_repo = BatteryRepository(database)
     command_repo = CommandRepository(database)
     message_repo = MessageRepository(database)
     alert_repo = AlertRepository(database)
@@ -114,21 +109,8 @@ def build_mock_container() -> Container:
     fake_gps = FakeGps()
     location_service = LocationService(gps=fake_gps, repository=location_repo)  # type: ignore[arg-type]
 
-    fake_battery_sensor = FakeBattery()
-
-    def on_battery_warning(message: str, tone) -> None:
-        output_service.play_tone(tone)
-        output_service.speak(message, priority="high")
-
-    battery_service = BatteryService(
-        sensor=fake_battery_sensor,  # type: ignore[arg-type]
-        repository=battery_repo,
-        on_warning=on_battery_warning,
-    )
-
     electrical_logger = ElectricalLoggerService(
         repository=electrical_repo,
-        battery_snapshot=battery_service.latest,
         fps_callback=detection_service.fps,
         inference_ms_callback=detection_service.inference_time_ms,
     )
@@ -140,7 +122,6 @@ def build_mock_container() -> Container:
         bridge=bridge,           # type: ignore[arg-type]
         detection_service=detection_service,
         location_service=location_service,
-        battery_service=battery_service,
         output_service=output_service,
         message_service=message_service,
         session_service=session_service,

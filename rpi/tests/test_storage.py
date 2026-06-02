@@ -5,8 +5,6 @@ from __future__ import annotations
 from datetime import timedelta
 
 from storage import (
-    BatteryRecord,
-    BatteryRepository,
     DetectionRecord,
     DetectionRepository,
     LocationRecord,
@@ -69,26 +67,6 @@ class TestLocationRepository:
         latest = repo.latest()
         assert latest is not None
         assert latest["latitude"] == 14.6
-
-
-class TestBatteryRepository:
-    def test_save_and_latest(self, database) -> None:
-        repo = BatteryRepository(database)
-        ts = now_utc()
-        repo.save(
-            BatteryRecord(
-                timestamp=ts,
-                unix_ts=unix_timestamp(ts),
-                voltage=4.0,
-                current=2000,
-                percentage=80,
-                temperature=35.0,
-                health_status="good",
-                status_json="{}",
-            )
-        )
-        latest = repo.latest()
-        assert latest["percentage"] == 80
 
 
 class TestRetention:

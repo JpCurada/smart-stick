@@ -7,7 +7,6 @@
  */
 import { API_BASE_URL, REQUEST_TIMEOUT_MS } from '@/constants/api';
 import type {
-  BatteryStatus,
   CommandAck,
   LatestDetectionsResponse,
   LocationFix,
@@ -56,9 +55,6 @@ export const api = {
   // --- Status & Health ---
   health: () => request<{ status: string; timestamp: string }>('/api/health'),
   status: () => request<StatusResponse>('/api/status'),
-
-  // --- Battery ---
-  battery: () => request<BatteryStatus>('/api/battery'),
 
   // --- Location ---
   location: () => request<LocationFix>('/api/location'),

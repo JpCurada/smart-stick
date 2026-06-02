@@ -14,7 +14,6 @@ _log = get_logger(__name__)
 _RETENTION_TABLES: dict[str, tuple[str, str]] = {
     "detections": ("detections", "unix_ts"),
     "locations": ("locations", "unix_ts"),
-    "battery_status": ("battery_status", "unix_ts"),
     "commands": ("commands", "timestamp"),
     "messages": ("messages", "timestamp"),
     "electrical_log": ("electrical_log", "timestamp"),

@@ -38,9 +38,6 @@ def _build_test_container(database):
         SessionRepository,
     )
 
-    bridge = MagicMock()
-    bridge.is_healthy.return_value = True
-
     spi_link = MagicMock()
     spi_link.send_command.return_value = True
     spi_link.transfer.return_value = None
@@ -79,16 +76,6 @@ def _build_test_container(database):
         "timestamp": "2024-05-06T12:00:23Z",
     }
 
-    battery_service = MagicMock()
-    battery_service.latest.return_value = {
-        "voltage_v": 4.0,
-        "current_ma": 2000,
-        "percentage": 80,
-        "temperature_c": 35.0,
-        "health": "good",
-        "estimated_runtime_minutes": 180,
-    }
-
     session_service = SessionService(repository=SessionRepository(database))
     message_service = MessageService(output=output_service, repository=message_repo)
     electrical_logger = MagicMock()
@@ -101,20 +88,22 @@ def _build_test_container(database):
     metrics_service = MagicMock()
     metrics_service.snapshot.return_value = {}
 
+    movement_analyzer = MagicMock()
+    movement_analyzer.recent.return_value = []
+
     return Container(
         database=database,
         output_queue=queue,
-        bridge=bridge,
         spi_link=spi_link,
         detection_service=detection_service,
         location_service=location_service,
-        battery_service=battery_service,
         output_service=output_service,
         message_service=message_service,
         session_service=session_service,
         electrical_logger=electrical_logger,
         sos_service=sos_service,
         metrics_service=metrics_service,
+        movement_analyzer=movement_analyzer,
         frame_buffer=frame_buffer,
     )
 
@@ -137,13 +126,6 @@ class TestApi:
         resp = client.get("/api/health")
         assert resp.status_code == 200
         assert resp.json()["status"] == "ok"
-
-    def test_battery(self, client) -> None:
-        resp = client.get("/api/battery")
-        assert resp.status_code == 200
-        body = resp.json()
-        assert body["percentage"] == 80
-        assert body["health"] == "good"
 
     def test_location(self, client) -> None:
         resp = client.get("/api/location")

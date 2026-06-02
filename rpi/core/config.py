@@ -72,6 +72,11 @@ class Config:
     CAMERA_DEVICE: Final[str] = _env_str("CAMERA_DEVICE", "/dev/video0")
     CAMERA_WIDTH: Final[int] = _env_int("CAMERA_WIDTH", 320)
     CAMERA_HEIGHT: Final[int] = _env_int("CAMERA_HEIGHT", 240)
+    # Clockwise rotation applied to captured frames, in degrees. The CSI
+    # camera is mounted sideways on the stick, so the native frame needs a
+    # 90° turn. Valid values: 0, 90, 180, 270. Flip to 270 if the image
+    # comes out upside down relative to walking direction.
+    CAMERA_ROTATION: Final[int] = _env_int("CAMERA_ROTATION", 90)
 
     GPS_PORT: Final[str] = _env_str("GPS_PORT", "/dev/ttyUSB0")
     GPS_BAUDRATE: Final[int] = _env_int("GPS_BAUDRATE", 9600)
@@ -87,11 +92,6 @@ class Config:
 
     IMU_I2C_BUS: Final[int] = _env_int("IMU_I2C_BUS", 1)
     IMU_I2C_ADDRESS: Final[int] = _env_int("IMU_I2C_ADDRESS", 0x68)
-
-    BATTERY_UPDATE_INTERVAL_S: Final[int] = _env_int("BATTERY_UPDATE_INTERVAL_S", 30)
-    BATTERY_WARN_50: Final[bool] = _env_bool("BATTERY_WARN_50", True)
-    BATTERY_WARN_25: Final[bool] = _env_bool("BATTERY_WARN_25", True)
-    BATTERY_WARN_10: Final[bool] = _env_bool("BATTERY_WARN_10", True)
 
     # ── ESP32 SPI sensor hub ────────────────────────────────────────────
     # The ESP32 is an SPI slave; the RPi is the master. Each transfer is a
@@ -111,12 +111,6 @@ class Config:
     ESP32_DROP_DETECTION_M: Final[float] = _env_float("ESP32_DROP_DETECTION_M", 0.25)
     ESP32_OVERHEAD_DETECTION_M: Final[float] = _env_float("ESP32_OVERHEAD_DETECTION_M", 0.5)
 
-    # UART bridge — used only by BatterySensor today (battery isn't in the
-    # SPI packet yet). When the bridge port is missing, BatterySensor falls
-    # back to a simulated drain so the rest of the system still boots.
-    ESP32_PORT: Final[str] = _env_str("ESP32_PORT", "/dev/serial0")
-    ESP32_BAUDRATE: Final[int] = _env_int("ESP32_BAUDRATE", 115200)
-
     HAPTICS_PIN: Final[int] = _env_int("HAPTICS_PIN", 26)
     BUZZER_PIN: Final[int] = _env_int("BUZZER_PIN", 27)
 
@@ -126,6 +120,10 @@ class Config:
     TTS_ENABLED: Final[bool] = _env_bool("TTS_ENABLED", True)
     TTS_RATE_WPM: Final[int] = _env_int("TTS_RATE_WPM", 80)
     TTS_VOLUME: Final[float] = _env_float("TTS_VOLUME", 1.0)
+    # espeak-ng voice id. "english+f3" = female-pitched English. Set to ""
+    # to fall back to the OS default voice. Enumerate available voices with
+    # `espeak-ng --voices` on the Pi.
+    TTS_VOICE: Final[str] = _env_str("TTS_VOICE", "english+f3")
 
     @classmethod
     def is_dev(cls) -> bool:

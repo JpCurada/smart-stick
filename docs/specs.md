@@ -53,7 +53,6 @@ Data Flow:
 - Ultrasonic #1 (GPIO) → Overhead detection
 - Ultrasonic #2 (GPIO) → Step/elevation detection
 - IMU (I2C) → Orientation
-- Battery (ADC) → Power monitoring
 
 **Layer 2: Processing (RPi 5)**
 - Detection loop (5-6 FPS)
@@ -167,7 +166,6 @@ BOTTOM (0cm):
 | Standard Object Alert | 1000 Hz | 200ms | Single tone | Person/car/obstacle detected |
 | Elevation Alert | 1500 Hz | 300ms | Single tone | Stairs, low ceiling detected |
 | Emergency SOS | 2500 Hz | 500ms | Repeating (500ms on/200ms off) | SOS button pressed |
-| Battery Warning | 800 Hz | 100ms | Triple beep (50ms gaps) | Battery at 50/25/10% |
 | Message Received | 2000 Hz | 300ms | Single tone | New TTS message arriving |
 | Good WiFi Signal | 1200 Hz | 100ms | Single beep | Strong connection |
 | Weak WiFi Signal | 1000 Hz | 200ms | Slow beep | Weak connection |
@@ -176,7 +174,6 @@ BOTTOM (0cm):
 **Design Principles:**
 - Each frequency visibly distinct (400+ Hz difference between critical alerts)
 - SOS tone (2500 Hz) clearly different from all others
-- Battery warning (800 Hz) uses pattern (beep-beep-beep) for recognition
 - User learns to associate frequency with alert type
 
 ### **3.3 Combined Alert Response**
@@ -190,26 +187,13 @@ BOTTOM (0cm):
 
 ---
 
-## **4. Battery Monitoring & Warnings**
+## **4. Battery Life**
 
-### **4.1 Battery Warning System**
+> **Note:** Battery monitoring and voice warnings have been removed. The
+> stick no longer reads battery telemetry or announces battery levels.
+> The hardware battery and its expected runtime below remain unchanged.
 
-**Three Threshold Warnings:**
-
-| Percentage | Voice Announcement | Buzzer | Frequency |
-|------------|-------------------|--------|-----------|
-| 50% | "Battery at 50 percent. Consider charging." | 800 Hz × 3 | Once at threshold |
-| 25% | "Battery at 25 percent. Charging recommended soon." | 800 Hz × 3 | Once at threshold |
-| 10% | "Battery critically low at 10 percent." | 800 Hz × 3 | Once per minute |
-
-**Design Principles:**
-- Voice + buzzer combination for redundancy
-- Only one announcement per threshold (no repeated alerts)
-- Clear, understandable speech
-- Audible over ambient noise
-- Critical (10%) repeats to emphasize urgency
-
-### **4.2 Battery Life Estimates**
+### **4.1 Battery Life Estimates**
 
 **Expected Runtime by Activity:**
 
@@ -457,9 +441,6 @@ inference_time_ms, memory_usage_mb, uptime_seconds
 - `GET /api/location` - Current GPS location
 - `GET /api/history/location?hours=24` - Location history
 - `GET /api/history/location/geojson` - GeoJSON format for maps
-
-**Battery Endpoint:**
-- `GET /api/battery` - Current battery status
 
 **Camera Endpoints:**
 - `GET /api/latest_frame` - Latest JPEG image

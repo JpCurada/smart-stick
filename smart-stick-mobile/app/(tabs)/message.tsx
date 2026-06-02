@@ -44,7 +44,7 @@ export default function MessageScreen() {
 
   const history = usePoll(
     useCallback(() => api.messageHistory(), []),
-    POLL_INTERVALS.battery,
+    POLL_INTERVALS.status,
   );
 
   const send = async (text: string) => {

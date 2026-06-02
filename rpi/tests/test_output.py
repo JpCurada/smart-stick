@@ -3,28 +3,35 @@
 from __future__ import annotations
 
 import threading
+import time
 from unittest.mock import MagicMock
 
-from core.types import BuzzerTone, VibrationPattern
+from core.types import BuzzerTone, SpeechPriority, VibrationPattern
 from output.buzzer import BuzzerController
 from output.haptics import HapticsController
 from output.output_queue import OutputCommand, OutputQueue
+from services.output_service import OutputService
 
 
 class TestHapticsController:
-    def test_positive_intensity_turns_motor_on(self) -> None:
+    def test_positive_intensity_asserts_on(self) -> None:
+        # Assert ON once and stop. The firmware self-clears the motor when
+        # the RPi stops asserting ON — sending (and latching) was fine, but
+        # there is no standalone OFF command to send.
         link = MagicMock()
         link.send_command.return_value = True
         controller = HapticsController(link=link)
         controller.vibrate(intensity=200, duration_ms=100)
         link.send_command.assert_called_once_with(buzzer_cmd=0, vibrator_cmd=1)
 
-    def test_zero_intensity_turns_motor_off(self) -> None:
+    def test_zero_intensity_is_noop(self) -> None:
+        # There is no usable OFF command; intensity 0 sends nothing and the
+        # firmware's own vibrator_update turns the motor off.
         link = MagicMock()
         link.send_command.return_value = True
         controller = HapticsController(link=link)
-        controller.vibrate(intensity=0, duration_ms=100)
-        link.send_command.assert_called_once_with(buzzer_cmd=0, vibrator_cmd=0)
+        assert controller.vibrate(intensity=0, duration_ms=100) is True
+        link.send_command.assert_not_called()
 
     def test_runs_without_link(self) -> None:
         controller = HapticsController(link=None)
@@ -98,3 +105,116 @@ class TestOutputQueue:
         queue.submit(OutputCommand(action=good, name="good"))
         assert ok.wait(timeout=1.0)
         queue.stop()
+
+
+class _GatedSpeaker:
+    """Fake speaker whose utterances block until released — lets a test
+    hold one utterance 'live' while submitting competing ones.
+
+    Each utterance gets its own release event, and ``stop()`` releases only
+    the in-flight one — mirroring how the real engine's stop interrupts the
+    current utterance, not future ones."""
+
+    def __init__(self) -> None:
+        self.played: list[str] = []
+        self._started = threading.Event()
+        self._lock = threading.Lock()
+        self._current_release: threading.Event | None = None
+
+    def speak(self, text: str, priority: str = "normal") -> bool:
+        release = threading.Event()
+        with self._lock:
+            self.played.append(text)
+            self._current_release = release
+        self._started.set()
+        release.wait(timeout=2.0)
+        return True
+
+    def stop(self) -> None:
+        # Interrupt only the utterance currently in flight.
+        with self._lock:
+            if self._current_release is not None:
+                self._current_release.set()
+
+    def estimate_duration_ms(self, text: str) -> int:
+        return 100
+
+    def wait_started(self, timeout: float = 1.0) -> bool:
+        return self._started.wait(timeout=timeout)
+
+    def release(self) -> None:
+        with self._lock:
+            if self._current_release is not None:
+                self._current_release.set()
+
+
+class TestSpeechHierarchy:
+    """Earpiece is a single live slot: strict tier, never a queue.
+
+    Guardian (rank 0) > LSTM (1) > Detection (2). A strictly-higher tier
+    drops a newcomer; equal-or-higher interrupts and replaces.
+    """
+
+    def _service(self, speaker: _GatedSpeaker) -> tuple[OutputService, OutputQueue]:
+        queue = OutputQueue()
+        queue.start()
+        svc = OutputService(
+            haptics=MagicMock(),
+            buzzer=MagicMock(),
+            speaker=speaker,  # type: ignore[arg-type]
+            queue=queue,
+            command_repo=MagicMock(),
+            message_repo=None,
+        )
+        return svc, queue
+
+    def test_lower_tier_dropped_while_higher_active(self) -> None:
+        speaker = _GatedSpeaker()
+        svc, queue = self._service(speaker)
+        try:
+            svc.speak("guardian here", source=SpeechPriority.GUARDIAN)
+            assert speaker.wait_started()  # guardian is live (blocking)
+            # LSTM arrives while guardian speaks -> must be DROPPED, not queued.
+            svc.speak("lstm nav", source=SpeechPriority.LSTM)
+            speaker.release()
+            queue.stop()
+            assert speaker.played == ["guardian here"]
+        finally:
+            queue.stop()
+
+    @staticmethod
+    def _wait_for(speaker: _GatedSpeaker, text: str, timeout: float = 1.5) -> bool:
+        # Release the in-flight utterance repeatedly until `text` plays or we
+        # give up — the single worker plays utterances one at a time.
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            if text in speaker.played:
+                return True
+            speaker.release()
+            time.sleep(0.02)
+        return text in speaker.played
+
+    def test_higher_tier_interrupts_lower(self) -> None:
+        speaker = _GatedSpeaker()
+        svc, queue = self._service(speaker)
+        try:
+            svc.speak("detection alert", source=SpeechPriority.DETECTION)
+            assert speaker.wait_started()
+            # Guardian outranks detection -> interrupts and plays.
+            svc.speak("guardian message", source=SpeechPriority.GUARDIAN)
+            assert self._wait_for(speaker, "guardian message")
+        finally:
+            speaker.release()
+            queue.stop()
+
+    def test_equal_tier_newest_replaces(self) -> None:
+        speaker = _GatedSpeaker()
+        svc, queue = self._service(speaker)
+        try:
+            svc.speak("lstm old", source=SpeechPriority.LSTM)
+            assert speaker.wait_started()
+            svc.speak("lstm new", source=SpeechPriority.LSTM)
+            assert self._wait_for(speaker, "lstm new")
+        finally:
+            speaker.release()
+            queue.stop()

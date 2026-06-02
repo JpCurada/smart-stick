@@ -12,7 +12,6 @@ from typing import Any
 from storage.database import Database
 from storage.models import (
     AlertRecord,
-    BatteryRecord,
     CommandRecord,
     DetectionRecord,
     ElectricalRecord,
@@ -114,46 +113,6 @@ class LocationRepository:
 
     def delete_older_than(self, unix_ts: int) -> int:
         cursor = self._db.execute("DELETE FROM locations WHERE unix_ts < ?", (unix_ts,))
-        return cursor.rowcount
-
-
-class BatteryRepository:
-    def __init__(self, db: Database) -> None:
-        self._db = db
-
-    def save(self, record: BatteryRecord) -> None:
-        self._db.execute(
-            """
-            INSERT INTO battery_status
-                (timestamp, unix_ts, voltage, current, percentage,
-                 temperature, health_status, status_json)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                iso_timestamp(record.timestamp),
-                record.unix_ts,
-                record.voltage,
-                record.current,
-                record.percentage,
-                record.temperature,
-                record.health_status,
-                record.status_json,
-            ),
-        )
-
-    def latest(self) -> dict[str, Any] | None:
-        row = self._db.fetch_one("SELECT * FROM battery_status ORDER BY unix_ts DESC LIMIT 1")
-        return _row_to_dict(row) if row else None
-
-    def since(self, unix_ts: int) -> list[dict[str, Any]]:
-        rows = self._db.fetch_all(
-            "SELECT * FROM battery_status WHERE unix_ts >= ? " "ORDER BY unix_ts ASC",
-            (unix_ts,),
-        )
-        return [_row_to_dict(r) for r in rows]
-
-    def delete_older_than(self, unix_ts: int) -> int:
-        cursor = self._db.execute("DELETE FROM battery_status WHERE unix_ts < ?", (unix_ts,))
         return cursor.rowcount
 
 
@@ -299,17 +258,13 @@ class ElectricalRepository:
         self._db.execute(
             """
             INSERT INTO electrical_log
-                (timestamp, battery_voltage_v, battery_current_ma,
-                 battery_percentage, rpi_temp_c, esp32_temp_c,
+                (timestamp, rpi_temp_c, esp32_temp_c,
                  wifi_signal_strength_db, detection_fps, inference_time_ms,
                  memory_usage_mb, memory_usage_percent, uptime_seconds)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 iso_timestamp(record.timestamp),
-                record.battery_voltage_v,
-                record.battery_current_ma,
-                record.battery_percentage,
                 record.rpi_temp_c,
                 record.esp32_temp_c,
                 record.wifi_signal_strength_db,

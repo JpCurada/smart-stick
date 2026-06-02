@@ -1,14 +1,13 @@
 /**
- * Tab 1: HOME — device status & battery.
+ * Tab 1: HOME — device status.
  *
- * Polls /api/battery and /api/status; degrades to an offline state if the
- * stick is unreachable.
+ * Polls /api/status; degrades to an offline state if the stick is
+ * unreachable.
  */
 import { useCallback, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { BatteryCard } from '@/components/battery-card';
 import { InfoRow } from '@/components/info-row';
 import { SosBanner } from '@/components/sos-banner';
 import { StatusBadge } from '@/components/status-badge';
@@ -20,13 +19,12 @@ import { usePoll } from '@/hooks/use-poll';
 import { api } from '@/lib/api';
 
 export default function HomeScreen() {
-  const battery = usePoll(useCallback(() => api.battery(), []), POLL_INTERVALS.battery);
-  const status = usePoll(useCallback(() => api.status(), []), POLL_INTERVALS.battery);
+  const status = usePoll(useCallback(() => api.status(), []), POLL_INTERVALS.status);
 
-  const online = battery.error == null && battery.data != null;
+  const online = status.error == null && status.data != null;
   const fps = status.data?.detection.fps ?? null;
   const inferenceMs = status.data?.detection.inference_time_ms ?? null;
-  const lastSync = battery.data?.timestamp ?? status.data?.timestamp ?? null;
+  const lastSync = status.data?.timestamp ?? null;
 
   // Track which SOS timestamps the guardian has acknowledged so the banner
   // can be dismissed but reappear instantly if the user presses SOS again.
@@ -39,7 +37,7 @@ export default function HomeScreen() {
       <ScrollView
         contentContainerStyle={styles.content}
         refreshControl={
-          <RefreshControl refreshing={battery.loading} onRefresh={battery.refetch} />
+          <RefreshControl refreshing={status.loading} onRefresh={status.refetch} />
         }
       >
         <View style={styles.header}>
@@ -53,8 +51,6 @@ export default function HomeScreen() {
           triggeredAt={sos?.timestamp ?? null}
           onDismiss={() => setAcknowledgedAt(sos?.timestamp ?? null)}
         />
-
-        <BatteryCard battery={battery.data} />
 
         <View style={styles.section}>
           <ThemedText type="subtitle">Detection</ThemedText>

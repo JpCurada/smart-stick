@@ -58,11 +58,11 @@ journalctl -u smartstick -f
 ```
 rpi/
 ├── core/         Configuration, constants, types, exceptions
-├── sensors/      Hardware abstraction (camera, gps, lidar, ultrasonic, imu, battery, esp32)
+├── sensors/      Hardware abstraction (camera, gps, lidar, ultrasonic, imu, esp32)
 ├── detection/    YOLO model, alert engine, rate limiter, distance fusion, detection loop
 ├── output/       Vibration, buzzer, TTS, async command queue
 ├── storage/      SQLite database, Pydantic models, repositories, migrations
-├── services/     Orchestrators (detection, location, battery, electrical log, sessions, messages)
+├── services/     Orchestrators (detection, location, electrical log, sessions, messages)
 ├── api/          FastAPI app, routes, DI container, schemas, middleware
 ├── utils/        Shared utilities (logger, decorators, geometry, validators, converters)
 ├── tests/        Unit tests (no hardware required)
@@ -86,7 +86,6 @@ allowed to chain sensors → detection → storage → output.
 | GET    | `/location`                      | Most recent GPS fix                           |
 | GET    | `/history/location?hours=24`     | Location history                              |
 | GET    | `/history/location/geojson`      | Location history as GeoJSON                   |
-| GET    | `/battery`                       | Battery percentage, voltage, health, runtime  |
 | GET    | `/latest_frame`                  | Latest JPEG (501 in MVP — streaming pending)  |
 | POST   | `/vibrate`                       | Trigger vibration `{intensity, duration_ms}`  |
 | POST   | `/buzz`                          | Play buzzer `{frequency_hz, duration_ms}`     |

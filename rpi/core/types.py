@@ -83,6 +83,12 @@ class Detection:
     distance_m: float
     bbox: tuple[int, int, int, int] | None = None
     timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    # Where distance_m came from: "lidar" (firmware forward LiDAR), "camera"
+    # (YOLO estimate), or "ultrasonic" (firmware overhead/drop flag). The
+    # firmware drives the motor itself for forward LiDAR obstacles, so the
+    # RPi suppresses its own vibration only when distance_source == "lidar"
+    # to avoid double-driving the motor for the same obstacle.
+    distance_source: str | None = None
 
 
 @dataclass(frozen=True)

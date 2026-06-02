@@ -105,25 +105,6 @@ def location_geojson(
     }
 
 
-# --------------------------- Battery ----------------------------------------- #
-
-
-@router.get("/battery")
-def battery_status(c: Container = Depends(_container)) -> dict[str, Any]:
-    latest = c.battery_service.latest()
-    if latest is None:
-        raise HTTPException(status_code=404, detail="no battery reading yet")
-    return {
-        "percentage": latest["percentage"],
-        "voltage": latest["voltage_v"],
-        "current": latest.get("current_ma"),
-        "health": latest["health"],
-        "runtime_minutes": latest.get("estimated_runtime_minutes"),
-        "temperature_c": latest.get("temperature_c"),
-        "timestamp": iso_timestamp(),
-    }
-
-
 # --------------------------- Camera ------------------------------------------ #
 
 
@@ -248,7 +229,6 @@ def health() -> dict[str, Any]:
 @router.get("/status")
 def status(c: Container = Depends(_container)) -> dict[str, Any]:
     return {
-        "battery": c.battery_service.latest(),
         "location": c.location_service.latest(),
         "session": c.session_service.snapshot(),
         "detection": {

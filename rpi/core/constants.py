@@ -39,7 +39,6 @@ BUZZER_TONES: Final[dict[str, BuzzerTone]] = {
     # Kept for backwards compat with any caller still using the old name.
     "elevation_alert": BuzzerTone("elevation_alert", 1500, 300),
     "emergency_sos": BuzzerTone("emergency_sos", 2500, 500, pattern_count=3, gap_ms=200),
-    "battery_warning": BuzzerTone("battery_warning", 800, 100, pattern_count=3, gap_ms=50),
     "message_received": BuzzerTone("message_received", 2000, 300),
     "wifi_good": BuzzerTone("wifi_good", 1200, 100),
     "wifi_weak": BuzzerTone("wifi_weak", 1000, 200),
@@ -56,15 +55,6 @@ DISTANCE_THRESHOLDS_M: Final[dict[ObjectClass, float]] = {
     ObjectClass.OVERHEAD: 0.5,
     ObjectClass.OBSTACLE: 1.5,
     ObjectClass.UNKNOWN: 1.5,
-}
-
-
-BATTERY_WARNING_THRESHOLDS: Final[tuple[int, ...]] = (50, 25, 10)
-
-BATTERY_WARNING_MESSAGES: Final[dict[int, str]] = {
-    50: "Battery at 50 percent. Consider charging.",
-    25: "Battery at 25 percent. Charging recommended soon.",
-    10: "Battery critically low at 10 percent.",
 }
 
 
@@ -103,7 +93,6 @@ MAX_BUZZER_FREQUENCY: Final[int] = 5000
 RETENTION_DAYS: Final[dict[str, int]] = {
     "detections": 7,
     "locations": 7,
-    "battery_status": 7,
     "commands": 7,
     "messages": 7,
     "electrical_log": 7,

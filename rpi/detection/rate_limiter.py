@@ -1,4 +1,4 @@
-"""Per-key cooldown tracking. Reusable across alerts, battery warnings, etc."""
+"""Per-key cooldown tracking. Reusable across alerts, notifications, etc."""
 
 from __future__ import annotations
 

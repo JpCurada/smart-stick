@@ -39,22 +39,6 @@ CREATE TABLE IF NOT EXISTS locations (
 """
 
 
-BATTERY_DDL: Final[str] = """
-CREATE TABLE IF NOT EXISTS battery_status (
-    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    timestamp       TEXT NOT NULL,
-    unix_ts         INTEGER NOT NULL,
-    voltage         REAL NOT NULL,
-    current         INTEGER,
-    percentage      INTEGER NOT NULL,
-    temperature     REAL,
-    health_status   TEXT NOT NULL,
-    status_json     TEXT NOT NULL,
-    created_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-"""
-
-
 COMMANDS_DDL: Final[str] = """
 CREATE TABLE IF NOT EXISTS commands (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -123,9 +107,6 @@ ELECTRICAL_DDL: Final[str] = """
 CREATE TABLE IF NOT EXISTS electrical_log (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     timestamp       TEXT NOT NULL,
-    battery_voltage_v REAL NOT NULL,
-    battery_current_ma INTEGER,
-    battery_percentage INTEGER,
     rpi_temp_c      REAL,
     esp32_temp_c    REAL,
     wifi_signal_strength_db INTEGER,
@@ -177,8 +158,6 @@ INDEXES: Final[tuple[str, ...]] = (
     "CREATE INDEX IF NOT EXISTS idx_locations_ts ON locations(unix_ts);",
     "CREATE INDEX IF NOT EXISTS idx_locations_latlon ON locations(latitude, longitude);",
     "CREATE INDEX IF NOT EXISTS idx_locations_geohash ON locations(geohash);",
-    "CREATE INDEX IF NOT EXISTS idx_battery_ts ON battery_status(unix_ts);",
-    "CREATE INDEX IF NOT EXISTS idx_battery_pct ON battery_status(percentage);",
     "CREATE INDEX IF NOT EXISTS idx_alerts_ts ON alerts(timestamp);",
     "CREATE INDEX IF NOT EXISTS idx_sessions_start ON sessions(start_time);",
     "CREATE INDEX IF NOT EXISTS idx_electrical_ts ON electrical_log(timestamp);",
@@ -188,7 +167,6 @@ INDEXES: Final[tuple[str, ...]] = (
 ALL_TABLES: Final[tuple[str, ...]] = (
     DETECTIONS_DDL,
     LOCATIONS_DDL,
-    BATTERY_DDL,
     COMMANDS_DDL,
     MESSAGES_DDL,
     ALERTS_DDL,

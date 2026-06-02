@@ -32,21 +32,6 @@ def database(tmp_path: Path) -> Iterator:
 
 
 @pytest.fixture
-def mock_bridge() -> MagicMock:
-    bridge = MagicMock()
-    bridge.is_healthy.return_value = True
-    bridge.send_vibration.return_value = True
-    bridge.send_buzz.return_value = True
-    bridge.request_battery_status.return_value = {
-        "voltage_v": 4.0,
-        "current_ma": 2000,
-        "percentage": 75,
-        "temperature_c": 35.0,
-    }
-    return bridge
-
-
-@pytest.fixture
 def mock_camera() -> MagicMock:
     """A camera that returns a deterministic frame payload."""
     try:
