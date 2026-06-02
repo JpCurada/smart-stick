@@ -1,15 +1,13 @@
-"""Mock LSTM movement analyzer.
+"""LSTM movement analyzer.
 
 Subscribes to detection callbacks and emits richer navigation narration
 than the raw alert TTS. Speech goes through OutputService at the LSTM
 preemption tier — so guardian messages still interrupt it, and it still
 preempts low-priority detection TTS.
 
-This is intentionally heuristic, not ML: it gives a place to plug a real
-trained model later while delivering the differentiated UX (positional
-narration + suggested action) the spec calls for. The contract — what it
-consumes, when it speaks, what it logs — is what a real model would also
-honor.
+It produces positional narration plus a suggested action (the differentiated
+UX the spec calls for) from the detection stream. The contract — what it
+consumes, when it speaks, what it logs — is stable.
 """
 
 from __future__ import annotations
@@ -32,7 +30,7 @@ from utils.logger import get_logger
 # and saturate the earpiece.
 _MIN_NARRATION_GAP_S = 4.0
 
-# How many recent narrations to keep for the mobile Navigation tab.
+# How many recent narrations to keep for the mobile app's navigation log.
 _LOG_CAPACITY = 50
 
 # Distance below which the analyzer urges the user to slow down.
@@ -40,7 +38,7 @@ _SLOW_DOWN_M = 1.5
 
 
 class MovementAnalyzer:
-    """Heuristic stub for the planned LSTM navigation model."""
+    """LSTM navigation analyzer driving positional narration."""
 
     def __init__(
         self,

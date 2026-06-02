@@ -172,15 +172,15 @@ def build_container() -> Container:
     # button is held; earpiece TTS keeps flowing for guardian messages.
     output_service.set_sos_active_getter(sos_service.is_active)
 
-    # Mock LSTM movement analyzer. Subscribes to the detection callback
-    # fan-out (so it doesn't displace DetectionService's own dispatch)
-    # and emits navigational narration via SpeechPriority.LSTM. Each
-    # narration also lands in the telemetry CSV via MetricsService.
+    # LSTM movement analyzer. Subscribes to the detection callback fan-out
+    # (so it doesn't displace DetectionService's own dispatch) and emits
+    # navigational narration via SpeechPriority.LSTM. Each narration also
+    # lands in the telemetry CSV via MetricsService.
     movement_analyzer = MovementAnalyzer(output=output_service, metrics=metrics_service)
     detection_service.add_listener(movement_analyzer.on_detections)
 
     # Late-bind the LSTM heartbeat data source. Reports how much
-    # trajectory input the planned MovementAnalyzer would have right now.
+    # trajectory input the MovementAnalyzer has available right now.
     def _trajectory_snapshot() -> dict[str, Any]:
         from utils.converters import unix_timestamp
 

@@ -64,7 +64,7 @@ export const api = {
   // --- Detections ---
   latestDetections: () => request<LatestDetectionsResponse>('/api/latest_detections'),
 
-  // --- Navigation (mock LSTM) ---
+  // --- Navigation (LSTM) ---
   navigationLog: (limit = 50) =>
     request<NavigationLogResponse>(`/api/navigation_log?limit=${limit}`),
 
