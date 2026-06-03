@@ -16,15 +16,20 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { POLL_INTERVALS } from '@/constants/api';
 import { Palette } from '@/constants/theme';
+import { useEffectiveLocation } from '@/hooks/use-effective-location';
 import { usePoll } from '@/hooks/use-poll';
 import { api } from '@/lib/api';
 
 export default function LocationScreen() {
   const location = usePoll(useCallback(() => api.location(), []), POLL_INTERVALS.location);
-  const lat = typeof location.data?.latitude === 'number' ? location.data.latitude : null;
-  const lon = typeof location.data?.longitude === 'number' ? location.data.longitude : null;
+  const effective = useEffectiveLocation(location.data);
+  const lat = effective.latitude;
+  const lon = effective.longitude;
   const hasFix = lat != null && lon != null;
-  const online = location.error == null && hasFix;
+  // "Online" means a live stick fix. A phone fallback is still useful, but it's
+  // the caregiver's position, not the stick's — so it isn't "Live".
+  const online = location.error == null && effective.source === 'stick';
+  const onPhone = effective.source === 'phone';
 
   const openInMaps = () => {
     if (!hasFix) return;
@@ -42,16 +47,17 @@ export default function LocationScreen() {
       >
         <View style={styles.header}>
           <ThemedText type="title">Location</ThemedText>
-          <StatusBadge online={online} label={online ? 'Live' : 'No fix'} />
+          <StatusBadge online={online} label={online ? 'Live' : onPhone ? 'Phone' : 'No fix'} />
         </View>
 
         {hasFix ? (
           <View style={styles.mapWrap}>
-            <LeafletMap
-              latitude={lat}
-              longitude={lon}
-              accuracyM={location.data?.accuracy_m ?? null}
-            />
+            {onPhone && (
+              <ThemedText style={styles.sourceNote}>
+                Showing this phone&apos;s location — the stick has no GPS fix yet.
+              </ThemedText>
+            )}
+            <LeafletMap latitude={lat} longitude={lon} accuracyM={effective.accuracyM} />
             <Pressable onPress={openInMaps} style={styles.openMapsBtn}>
               <ThemedText style={styles.openMapsLabel}>Open in Google Maps</ThemedText>
             </Pressable>
@@ -95,7 +101,7 @@ export default function LocationScreen() {
           />
         </ThemedView>
 
-        {!online && (
+        {!online && !onPhone && (
           <ThemedText style={styles.errorBanner}>
             Indoors — no GPS signal. GPS only works outdoors with a clear view of the sky.
           </ThemedText>
@@ -115,6 +121,11 @@ const styles = StyleSheet.create({
   },
   mapWrap: {
     gap: 8,
+  },
+  sourceNote: {
+    fontSize: 13,
+    opacity: 0.8,
+    textAlign: 'center',
   },
   mapPlaceholder: {
     height: 280,

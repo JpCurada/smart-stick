@@ -2,9 +2,12 @@
  * Tab 3: FIND — locate the stick on a map and alert it remotely.
  *
  * Shows the stick's last known position, then two independent controls:
- *   • "Vibrate Stick" -> POST /api/vibrate (one strong pulse)
- *   • "Play Sound"    -> POST /api/buzz   (audible beep pattern)
+ *   • "Vibrate Stick" -> POST /api/find?mode=vibrate (haptics only, silent)
+ *   • "Play Sound"    -> POST /api/find?mode=buzz    (buzzer only, no vibration)
  *
+ * Both go through /api/find (not /api/vibrate or /api/buzz) so the backend
+ * re-asserts the override for the full alert window — a single one-shot
+ * command is cancelled by the firmware on its next loop and only blips.
  * The two are split so a helper can pick whichever cue is easier to notice.
  */
 import { Volume2, Vibrate } from 'lucide-react-native';
@@ -18,6 +21,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { POLL_INTERVALS } from '@/constants/api';
 import { Palette } from '@/constants/theme';
+import { useEffectiveLocation } from '@/hooks/use-effective-location';
 import { usePoll } from '@/hooks/use-poll';
 import { api } from '@/lib/api';
 
@@ -35,9 +39,11 @@ interface FeedbackState {
 
 export default function FindScreen() {
   const location = usePoll(useCallback(() => api.location(), []), POLL_INTERVALS.location);
-  const lat = typeof location.data?.latitude === 'number' ? location.data.latitude : null;
-  const lon = typeof location.data?.longitude === 'number' ? location.data.longitude : null;
+  const effective = useEffectiveLocation(location.data);
+  const lat = effective.latitude;
+  const lon = effective.longitude;
   const hasFix = lat != null && lon != null;
+  const onPhone = effective.source === 'phone';
 
   const [pending, setPending] = useState<Pending>(null);
   const [feedback, setFeedback] = useState<FeedbackState | null>(null);
@@ -47,14 +53,14 @@ export default function FindScreen() {
     setTimeout(() => setFeedback(null), 2500);
   };
 
-  // Both buttons trigger the same combined buzz+vibrate Find alert on the
-  // stick (POST /api/find). The backend re-asserts the override for the full
-  // alert duration so the firmware doesn't cancel it after one loop.
+  // Each button triggers a single-cue Find alert: vibrate-only or buzz-only.
+  // The backend re-asserts the chosen override for the full alert duration so
+  // the firmware doesn't cancel it after one loop.
   const handleFind = async (which: 'vibrate' | 'sound') => {
     setPending(which);
     try {
-      await api.findMyStick();
-      flash(which === 'vibrate' ? 'Vibrating the stick…' : 'Alerting the stick…', true);
+      await api.findMyStick(which === 'vibrate' ? 'vibrate' : 'buzz');
+      flash(which === 'vibrate' ? 'Vibrating the stick…' : 'Sounding the stick…', true);
     } catch {
       flash('Could not reach the stick.', false);
     } finally {
@@ -80,11 +86,12 @@ export default function FindScreen() {
 
         {hasFix ? (
           <View style={styles.mapWrap}>
-            <LeafletMap
-              latitude={lat}
-              longitude={lon}
-              accuracyM={location.data?.accuracy_m ?? null}
-            />
+            {onPhone && (
+              <ThemedText style={styles.sourceNote}>
+                Showing this phone&apos;s location — the stick has no GPS fix yet.
+              </ThemedText>
+            )}
+            <LeafletMap latitude={lat} longitude={lon} accuracyM={effective.accuracyM} />
           </View>
         ) : (
           <ThemedView style={styles.mapPlaceholder}>
@@ -138,6 +145,11 @@ const styles = StyleSheet.create({
   },
   subtitle: { opacity: 0.7 },
   mapWrap: { gap: 8 },
+  sourceNote: {
+    fontSize: 13,
+    opacity: 0.8,
+    textAlign: 'center',
+  },
   mapPlaceholder: {
     height: 280,
     borderRadius: 12,

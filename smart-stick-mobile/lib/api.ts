@@ -84,7 +84,9 @@ export const api = {
       body: JSON.stringify({ frequency_hz: frequencyHz, duration_ms: durationMs }),
     }),
   emergencySos: () => request<CommandAck>('/api/emergency/sos', { method: 'POST' }),
-  findMyStick: () => request<CommandAck>('/api/find', { method: 'POST' }),
+  // mode: 'both' (buzz+vibrate), 'vibrate' (haptics only), 'buzz' (sound only).
+  findMyStick: (mode: 'both' | 'vibrate' | 'buzz' = 'both') =>
+    request<CommandAck>(`/api/find?mode=${mode}`, { method: 'POST' }),
 
   // --- Messages ---
   sendMessage: (text: string, priority: MessagePriority = 'normal') =>

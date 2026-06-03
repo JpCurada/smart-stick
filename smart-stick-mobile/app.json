@@ -37,7 +37,14 @@
           }
         }
       ],
-      "expo-font"
+      "expo-font",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Smart Stick uses your phone's location as a fallback on the map when the stick has no GPS fix.",
+          "locationWhenInUsePermission": "Smart Stick uses your phone's location as a fallback on the map when the stick has no GPS fix."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
