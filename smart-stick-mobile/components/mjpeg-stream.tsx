@@ -14,6 +14,12 @@ type Props = {
 };
 
 function buildHtml(url: string): string {
+  // The <img> holds a single multipart/x-mixed-replace connection. If that
+  // connection ever ends or stalls — server timeout, WiFi blip, camera hiccup —
+  // a plain <img> freezes on its last frame then goes black and never recovers.
+  // So we reconnect on error AND run a stall watchdog: each delivered frame
+  // bumps a heartbeat, and if no frame lands within STALL_MS we force a fresh
+  // connection (cache-busted) so the feed comes back on its own.
   return `<!DOCTYPE html>
 <html>
   <head>
@@ -27,8 +33,34 @@ function buildHtml(url: string): string {
   </head>
   <body>
     <div class="wrap">
-      <img src="${url}" alt="stream" />
+      <img id="stream" alt="stream" />
     </div>
+    <script>
+      var BASE = ${JSON.stringify(url)};
+      var STALL_MS = 4000;
+      var RECONNECT_MS = 1000;
+      var img = document.getElementById('stream');
+      var lastFrameAt = Date.now();
+
+      function connect() {
+        var sep = BASE.indexOf('?') === -1 ? '?' : '&';
+        img.src = BASE + sep + 'cb=' + Date.now();
+        lastFrameAt = Date.now();
+      }
+
+      // Each frame in a multipart stream fires a load event — use it as a heartbeat.
+      img.addEventListener('load', function () { lastFrameAt = Date.now(); });
+      img.addEventListener('error', function () {
+        setTimeout(connect, RECONNECT_MS);
+      });
+
+      // Watchdog: if frames stop arriving, reconnect.
+      setInterval(function () {
+        if (Date.now() - lastFrameAt > STALL_MS) connect();
+      }, 1000);
+
+      connect();
+    </script>
   </body>
 </html>`;
 }
@@ -42,7 +74,7 @@ export function MjpegStream({ url }: Props) {
         originWhitelist={['*']}
         source={{ html }}
         style={styles.webview}
-        javaScriptEnabled={false}
+        javaScriptEnabled
         scrollEnabled={false}
         androidLayerType="hardware"
         mixedContentMode="always"
