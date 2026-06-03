@@ -52,15 +52,6 @@ class DetectionLoop:
         self._frames_processed = 0
         self._start_time = 0.0
         self._frame_buffer = frame_buffer
-        # Dedicated camera-capture thread state. The capture loop reads the
-        # camera at camera rate and publishes RAW frames to the buffer so the
-        # video stream never starves while YOLO (slow on the RPi CPU) runs. The
-        # detection loop pulls the latest raw frame from here, runs inference,
-        # and overwrites the buffer with the annotated frame when ready.
-        self._capture_thread: threading.Thread | None = None
-        self._latest_raw: object | None = None
-        self._latest_raw_meta: dict[str, object] = {}
-        self._raw_lock = threading.Lock()
 
     def set_callback(self, callback: DetectionCallback) -> None:
         """Register the listener invoked once per processed frame."""
@@ -76,21 +67,12 @@ class DetectionLoop:
 
         self._stop_flag.clear()
         self._start_time = time.monotonic()
-        # Capture runs on its own thread so raw frames reach the video buffer at
-        # camera rate, independent of how long detection takes.
-        self._capture_thread = threading.Thread(
-            target=self._capture_loop, name="camera-capture", daemon=True
-        )
-        self._capture_thread.start()
         self._thread = threading.Thread(target=self._run, name="detection-loop", daemon=True)
         self._thread.start()
         self._log.info("detection loop started at %d fps", self._fps)
 
     def stop(self, timeout_s: float = 3.0) -> None:
         self._stop_flag.set()
-        if self._capture_thread is not None:
-            self._capture_thread.join(timeout=timeout_s)
-            self._capture_thread = None
         if self._thread is not None:
             self._thread.join(timeout=timeout_s)
             self._thread = None
@@ -102,39 +84,6 @@ class DetectionLoop:
     def last_inference_ms(self) -> int:
         return self._last_inference_ms
 
-    def _capture_loop(self) -> None:
-        """Read the camera at camera rate; publish RAW frames to the buffer.
-
-        This is the video stream's frame source. Keeping it on its own thread
-        means a slow YOLO inference never starves the stream — the buffer keeps
-        getting fresh (un-annotated) frames at camera rate, and the detection
-        loop overwrites them with annotated frames whenever it catches up.
-        """
-        while not self._stop_flag.is_set():
-            try:
-                reading = self._camera.read()
-                if reading.healthy and "frame" in reading.data:
-                    frame = reading.data["frame"]
-                    with self._raw_lock:
-                        self._latest_raw = frame
-                        self._latest_raw_meta = {
-                            "width": reading.data.get("width"),
-                            "height": reading.data.get("height"),
-                        }
-                    if self._frame_buffer is not None:
-                        # Publish the raw frame immediately. Detection will
-                        # overwrite with an annotated copy when it finishes.
-                        self._frame_buffer.update(frame, time.time())
-            except Exception as exc:
-                self._log.warning("camera capture error: %s", exc)
-            # Capture as fast as the camera allows, capped at detection period so
-            # we don't spin; the camera's own read latency paces this in practice.
-            time.sleep(0.0 if self._period_s <= 0 else min(self._period_s, 0.03))
-
-    def _latest_capture(self) -> tuple[object | None, dict[str, object]]:
-        with self._raw_lock:
-            return self._latest_raw, dict(self._latest_raw_meta)
-
     def _run(self) -> None:
         while not self._stop_flag.is_set():
             loop_start = time.monotonic()
@@ -145,9 +94,11 @@ class DetectionLoop:
             self._sleep_for_target_fps(loop_start)
 
     def _process_one_frame(self) -> None:
-        frame, raw_meta = self._latest_capture()
-        if frame is None:
+        reading = self._camera.read()
+        if not reading.healthy or "frame" not in reading.data:
             return
+
+        frame = reading.data["frame"]
 
         inference_start = time.monotonic()
         predictions = self._yolo.predict(frame)
@@ -185,8 +136,8 @@ class DetectionLoop:
         if self._on_detections is not None:
             meta = {
                 "inference_ms": self._last_inference_ms,
-                "frame_width": raw_meta.get("width"),
-                "frame_height": raw_meta.get("height"),
+                "frame_width": reading.data.get("width"),
+                "frame_height": reading.data.get("height"),
                 "telemetry_read_at": telemetry_read_at,
                 "firmware_flag_sources": firmware_flag_sources,
             }
@@ -202,14 +153,6 @@ class DetectionLoop:
             import cv2  # type: ignore[import-not-found]
         except Exception:
             return frame
-
-        # Draw on a COPY: `frame` is the shared latest-raw frame that the capture
-        # thread keeps publishing. Annotating it in place would corrupt the raw
-        # stream frames (and race the capture thread).
-        try:
-            frame = frame.copy()
-        except Exception:
-            pass
 
         # Pair YOLO predictions with their fused-distance Detection (synthetic
         # detections at the tail have no matching prediction and no bbox).
