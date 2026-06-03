@@ -270,3 +270,36 @@ class TestFindMyStick:
         for c in calls:
             assert c.kwargs.get("buzzer_cmd", c.args[0] if c.args else 0) != 0
             assert c.kwargs.get("vibrator_cmd", c.args[1] if len(c.args) > 1 else 0) != 0
+
+    def _run_mode(self, mode: str) -> list:
+        link = MagicMock()
+        link.send_command.return_value = True
+        svc = OutputService(
+            haptics=MagicMock(),
+            buzzer=MagicMock(),
+            speaker=MagicMock(),
+            queue=MagicMock(),
+            command_repo=MagicMock(),
+            message_repo=None,
+            link=link,
+        )
+        svc.find_my_stick(mode=mode)
+        time.sleep(0.2)
+        svc.stop()
+        return link.send_command.call_args_list
+
+    def test_find_vibrate_mode_is_silent(self) -> None:
+        calls = self._run_mode("vibrate")
+        assert len(calls) > 1
+        # Vibrator on, buzzer silent for the whole window.
+        for c in calls:
+            assert c.kwargs["buzzer_cmd"] == 0
+            assert c.kwargs["vibrator_cmd"] != 0
+
+    def test_find_buzz_mode_does_not_vibrate(self) -> None:
+        calls = self._run_mode("buzz")
+        assert len(calls) > 1
+        # Buzzer on, vibrator off for the whole window.
+        for c in calls:
+            assert c.kwargs["buzzer_cmd"] != 0
+            assert c.kwargs["vibrator_cmd"] == 0

@@ -267,13 +267,18 @@ class OutputService:
     def emergency_sos(self) -> str:
         return self.play_tone(BUZZER_TONES["emergency_sos"], source="system")
 
-    def find_my_stick(self) -> str:
-        """Buzz + vibrate the cane so a sighted helper can locate it.
+    def find_my_stick(self, mode: str = "both") -> str:
+        """Alert the cane so a sighted helper can locate it.
+
+        ``mode`` selects which outputs fire:
+          • "both"    — buzz + vibrate (default)
+          • "vibrate" — vibrator only, buzzer silent
+          • "buzz"    — buzzer only, vibrator still
 
         The ESP32 re-runs its own buzzer/vibrator self-update every firmware
         loop and cancels a one-shot RPi override on the very next loop, so a
         single command produces at most an inaudible blip. Instead we run a
-        short-lived thread that re-asserts a COMBINED buzz+vibrate frame every
+        short-lived thread that re-asserts the selected frame every
         FIND_REASSERT_INTERVAL_S for FIND_ALERT_DURATION_S — faster than the
         firmware loops — so the cane keeps alerting for the full window.
 
@@ -281,12 +286,16 @@ class OutputService:
         haptics + buzzer are suppressed (see feedback_suppressed). Earpiece
         TTS is unaffected — guardian messages still come through.
         """
+        buzzer_cmd = _FIND_BUZZER_CMD if mode in ("both", "buzz") else 0
+        vibrator_cmd = _FIND_VIBRATOR_CMD if mode in ("both", "vibrate") else 0
+
         command_id = _command_id("cmd_find")
         params = {
-            "buzzer_cmd": _FIND_BUZZER_CMD,
-            "vibrator_cmd": _FIND_VIBRATOR_CMD,
+            "buzzer_cmd": buzzer_cmd,
+            "vibrator_cmd": vibrator_cmd,
             "duration_s": FIND_ALERT_DURATION_S,
             "name": "find_my_stick",
+            "mode": mode,
         }
         self._find_active_until = time.monotonic() + FIND_MY_STICK_BLOCK_SECONDS
 
@@ -294,27 +303,30 @@ class OutputService:
         self._stop_find_thread()
         self._find_stop.clear()
         self._find_thread = threading.Thread(
-            target=self._run_find_alert, name="find-my-stick", daemon=True
+            target=self._run_find_alert,
+            args=(buzzer_cmd, vibrator_cmd),
+            name="find-my-stick",
+            daemon=True,
         )
         self._find_thread.start()
 
         self._record(command_id, "find_my_stick", params, self._link is not None)
         return command_id
 
-    def _run_find_alert(self) -> None:
-        """Re-assert the combined Find override until the duration elapses."""
+    def _run_find_alert(self, buzzer_cmd: int, vibrator_cmd: int) -> None:
+        """Re-assert the selected Find override until the duration elapses."""
         if self._link is None:
             # No hardware link (dev/test) — nothing to drive.
             self._log.info(
                 "find(no link) buzz=%d vib=%d for %.1fs",
-                _FIND_BUZZER_CMD,
-                _FIND_VIBRATOR_CMD,
+                buzzer_cmd,
+                vibrator_cmd,
                 FIND_ALERT_DURATION_S,
             )
             return
         deadline = time.monotonic() + FIND_ALERT_DURATION_S
         while not self._find_stop.is_set() and time.monotonic() < deadline:
-            self._link.send_command(buzzer_cmd=_FIND_BUZZER_CMD, vibrator_cmd=_FIND_VIBRATOR_CMD)
+            self._link.send_command(buzzer_cmd=buzzer_cmd, vibrator_cmd=vibrator_cmd)
             time.sleep(FIND_REASSERT_INTERVAL_S)
 
     def _stop_find_thread(self) -> None:

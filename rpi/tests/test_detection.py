@@ -140,6 +140,69 @@ class TestDispatchMotorOwnership:
         output.play_vibration_pattern.assert_called_once()
 
 
+class TestRecognitionLog:
+    """The recognition feed must fill on every recognized object, independent
+    of whether the alert engine fires — that's what made it look empty next to
+    the always-on LSTM feed."""
+
+    def _service(self, *, triggered: bool) -> DetectionService:
+        engine = MagicMock()
+        engine.evaluate.return_value = AlertDecision(
+            triggered=triggered,
+            severity=AlertSeverity.HIGH,
+            vibration=None,
+            tone=None,
+            speak_text=None,
+        )
+        return DetectionService(
+            loop=MagicMock(),
+            alert_engine=engine,
+            output=MagicMock(),
+            detection_repo=MagicMock(),
+            alert_repo=MagicMock(),
+        )
+
+    def test_logs_recognition_without_alert(self) -> None:
+        service = self._service(triggered=False)
+        det = Detection(
+            object_class=ObjectClass.PERSON,
+            confidence=0.8,
+            distance_m=6.0,
+            distance_source="camera",
+            bbox=(0, 0, 10, 10),
+        )
+        service._on_detections([det], {"inference_ms": 12.0})
+        entries = service.recent_recognitions(limit=10)
+        assert len(entries) == 1
+        assert entries[0]["object_class"] == "person"
+
+    def test_skips_synthetic_detection_without_bbox(self) -> None:
+        service = self._service(triggered=True)
+        det = Detection(
+            object_class=ObjectClass.OVERHEAD,
+            confidence=1.0,
+            distance_m=0.4,
+            distance_source="ultrasonic",
+        )
+        service._on_detections([det], {})
+        assert service.recent_recognitions(limit=10) == []
+
+    def test_newest_first(self) -> None:
+        service = self._service(triggered=False)
+        for i in range(3):
+            det = Detection(
+                object_class=ObjectClass.PERSON,
+                confidence=0.5 + i * 0.1,
+                distance_m=5.0,
+                distance_source="camera",
+                bbox=(0, 0, 1, 1),
+            )
+            service._on_detections([det], {})
+        entries = service.recent_recognitions(limit=10)
+        # Last appended (confidence 0.7) comes first.
+        assert entries[0]["confidence"] == 0.7
+
+
 class TestPatternsAndTones:
     def test_pattern_for_person(self) -> None:
         p = pattern_for_object(ObjectClass.PERSON)

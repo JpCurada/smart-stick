@@ -42,6 +42,17 @@ def detections_history(
     return {"detections": DetectionRepository(c.database).since(since)}
 
 
+@router.get("/recognition_log")
+def recognition_log(
+    limit: int = Query(default=50, ge=1, le=200),
+    c: Container = Depends(_container),
+) -> dict[str, Any]:
+    return {
+        "entries": c.detection_service.recent_recognitions(limit=limit),
+        "timestamp": iso_timestamp(),
+    }
+
+
 @router.get("/navigation_log")
 def navigation_log(
     limit: int = Query(default=50, ge=1, le=200),
@@ -186,14 +197,22 @@ def emergency_sos(c: Container = Depends(_container)) -> CommandAck:
 
 
 @router.post("/find", response_model=CommandAck)
-def find_my_stick(c: Container = Depends(_container)) -> CommandAck:
-    """Make the cane buzz + vibrate so a sighted helper can locate it."""
+def find_my_stick(
+    mode: str = Query(default="both", pattern="^(both|vibrate|buzz)$"),
+    c: Container = Depends(_container),
+) -> CommandAck:
+    """Alert the cane so a sighted helper can locate it.
+
+    ``mode`` selects the cue: "both" (buzz+vibrate), "vibrate" (vibrator
+    only), or "buzz" (buzzer only).
+    """
     import time as _time
 
+    command_label = {"both": "buzz+vibrate", "vibrate": "vibrate", "buzz": "buzz"}[mode]
     start = _time.monotonic()
-    command_id = c.output_service.find_my_stick()
+    command_id = c.output_service.find_my_stick(mode=mode)
     latency_ms = (_time.monotonic() - start) * 1000.0
-    c.metrics_service.record_find_my_stick(latency_ms=latency_ms, command="buzz+vibrate")
+    c.metrics_service.record_find_my_stick(latency_ms=latency_ms, command=command_label)
     return CommandAck(success=True, command_id=command_id)
 
 

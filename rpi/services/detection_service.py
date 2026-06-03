@@ -5,6 +5,7 @@ from __future__ import annotations
 import threading
 import time
 import uuid
+from collections import deque
 
 from core.types import Detection, SpeechPriority
 from detection.alert_engine import AlertDecision, AlertEngine
@@ -20,6 +21,11 @@ from storage import (
 from storage.repositories import encode_json
 from utils.converters import iso_timestamp, now_utc, unix_timestamp
 from utils.logger import get_logger
+
+# How many recent recognitions to keep for the /api/recognition_log feed.
+# Mirrors the LSTM navigation buffer so the app's Recognition card scrolls
+# the same way the Navigation card does.
+_RECOGNITION_LOG_CAPACITY = 100
 
 
 class DetectionService:
@@ -43,6 +49,11 @@ class DetectionService:
         self._log = get_logger("services.detection")
         self._latest_detections: list[Detection] = []
         self._latest_alert: dict | None = None
+        # Rolling history of recognized objects, newest appended last. Filled on
+        # every frame a real (bbox-bearing) object is recognized — independent
+        # of whether the alert engine fired — so the app's Recognition feed is
+        # continuous like the LSTM one, instead of only logging on alerts.
+        self._recognition_log: deque[dict] = deque(maxlen=_RECOGNITION_LOG_CAPACITY)
         self._lock = threading.Lock()
         # Additional listeners (e.g. MovementAnalyzer) fan-out from here so
         # the DetectionLoop keeps its single-callback contract.
@@ -82,6 +93,10 @@ class DetectionService:
     def _on_detections(self, detections: list[Detection], meta: dict) -> None:
         triggered_any = False
         for detection in detections:
+            # Log the recognition itself for every real object, whether or not
+            # it crosses the alert threshold — this is what feeds the app's
+            # continuous Recognition card.
+            self._log_recognition(detection)
             decision = self._engine.evaluate(detection)
             if decision.triggered:
                 triggered_any = True
@@ -98,6 +113,32 @@ class DetectionService:
                 listener(detections, meta)
             except Exception as exc:
                 self._log.debug("detection listener failed: %s", exc)
+
+    def _log_recognition(self, detection: Detection) -> None:
+        """Append one recognized object to the rolling recognition feed.
+
+        Skips synthetic STAIRS/OVERHEAD detections (no bbox) — those come from
+        ultrasonic/firmware flags, not YOLO recognition, and have their own
+        alert path. Time-stamped so the app can show "x seconds ago".
+        """
+        if detection.bbox is None:
+            return
+        entry = {
+            "id": f"rec_{uuid.uuid4().hex[:10]}",
+            "timestamp": iso_timestamp(detection.timestamp),
+            "object_class": detection.object_class.value,
+            "confidence": round(detection.confidence, 3),
+            "distance_m": round(detection.distance_m, 2),
+        }
+        with self._lock:
+            self._recognition_log.append(entry)
+
+    def recent_recognitions(self, limit: int) -> list[dict]:
+        """Most recent recognitions, newest first. Feeds /api/recognition_log."""
+        with self._lock:
+            snapshot = list(self._recognition_log)
+        snapshot.reverse()
+        return snapshot[:limit]
 
     def _record_recognition_metric(self, detection: Detection, meta: dict) -> None:
         """YOLO recognized + classified one object. Log its inference time."""

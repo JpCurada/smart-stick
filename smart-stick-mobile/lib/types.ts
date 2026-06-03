@@ -55,6 +55,19 @@ export interface NavigationLogResponse {
   timestamp: string;
 }
 
+export interface RecognitionLogEntry {
+  id: string;
+  timestamp: string;
+  object_class: string;
+  confidence: number;
+  distance_m: number;
+}
+
+export interface RecognitionLogResponse {
+  entries: RecognitionLogEntry[];
+  timestamp: string;
+}
+
 export interface MessageHistoryItem {
   message_id: string;
   timestamp: string;

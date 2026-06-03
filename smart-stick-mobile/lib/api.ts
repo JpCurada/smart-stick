@@ -13,6 +13,7 @@ import type {
   MessageHistoryItem,
   MessagePriority,
   NavigationLogResponse,
+  RecognitionLogResponse,
   StatusResponse,
 } from './types';
 
@@ -67,6 +68,8 @@ export const api = {
   // --- Navigation (LSTM) ---
   navigationLog: (limit = 50) =>
     request<NavigationLogResponse>(`/api/navigation_log?limit=${limit}`),
+  recognitionLog: (limit = 50) =>
+    request<RecognitionLogResponse>(`/api/recognition_log?limit=${limit}`),
 
   // --- Camera ---
   latestFrameUrl: () => `${API_BASE_URL}/api/latest_frame?ts=${Date.now()}`,

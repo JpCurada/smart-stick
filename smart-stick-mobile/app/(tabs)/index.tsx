@@ -17,10 +17,12 @@ import { POLL_INTERVALS } from '@/constants/api';
 import { Palette } from '@/constants/theme';
 import { usePoll } from '@/hooks/use-poll';
 import { api } from '@/lib/api';
-import type { NavigationLogEntry } from '@/lib/types';
+import type { NavigationLogEntry, RecognitionLogEntry } from '@/lib/types';
 
 // Recent LSTM navigation narrations shown on Home.
 const LSTM_LOG_LIMIT = 10;
+// Recent YOLO recognitions shown on Home.
+const RECOGNITION_LOG_LIMIT = 10;
 
 export default function HomeScreen() {
   const status = usePoll(useCallback(() => api.status(), []), POLL_INTERVALS.status);
@@ -28,12 +30,20 @@ export default function HomeScreen() {
     useCallback(() => api.navigationLog(LSTM_LOG_LIMIT), []),
     POLL_INTERVALS.navigationLog,
   );
+  const recogLog = usePoll(
+    useCallback(() => api.recognitionLog(RECOGNITION_LOG_LIMIT), []),
+    POLL_INTERVALS.recognitionLog,
+  );
 
   const online = status.error == null && status.data != null;
   const fps = status.data?.detection.fps ?? null;
   const inferenceMs = status.data?.detection.inference_time_ms ?? null;
   const lastSync = status.data?.timestamp ?? null;
   const lstmEntries: NavigationLogEntry[] = (navLog.data?.entries ?? []).slice(0, LSTM_LOG_LIMIT);
+  const recogEntries: RecognitionLogEntry[] = (recogLog.data?.entries ?? []).slice(
+    0,
+    RECOGNITION_LOG_LIMIT,
+  );
 
   // Track which SOS timestamps the guardian has acknowledged so the banner
   // can be dismissed but reappear instantly if the user presses SOS again.
@@ -108,6 +118,29 @@ export default function HomeScreen() {
                     {new Date(entry.timestamp).toLocaleTimeString()}
                   </ThemedText>
                 </View>
+              </View>
+            ))
+          )}
+        </ThemedView>
+
+        <ThemedView style={styles.card}>
+          <ThemedText type="subtitle">Recognition</ThemedText>
+          {recogEntries.length === 0 ? (
+            <ThemedText style={styles.empty}>
+              No objects recognized yet. Detected objects appear here as the camera sees them.
+            </ThemedText>
+          ) : (
+            recogEntries.map((entry) => (
+              <View key={entry.id} style={styles.navEntry}>
+                <View style={styles.navMetaRow}>
+                  <ThemedText style={styles.navText}>{entry.object_class}</ThemedText>
+                  <ThemedText style={styles.navTime}>
+                    {new Date(entry.timestamp).toLocaleTimeString()}
+                  </ThemedText>
+                </View>
+                <ThemedText style={styles.navMeta}>
+                  {entry.distance_m.toFixed(1)} m · {(entry.confidence * 100).toFixed(0)}%
+                </ThemedText>
               </View>
             ))
           )}
