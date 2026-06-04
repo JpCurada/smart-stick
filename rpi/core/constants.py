@@ -60,17 +60,19 @@ QUICK_MESSAGES: Final[tuple[str, ...]] = (
 )
 
 
+# YOLO COCO classes we deliberately IGNORE — they are dropped during inference
+# so they produce no bounding box, no alert, and no speech. Vehicles are
+# excluded on purpose (the cane is for indoor / pedestrian use; vehicle alerts
+# were noisy and unwanted).
+YOLO_IGNORED_CLASSES: Final[frozenset[str]] = frozenset(
+    {"car", "motorcycle", "bus", "truck", "train"}
+)
+
+
 # YOLO COCO classes mapped to our internal ObjectClass enum.
-# Vehicles (car/motorcycle/bus/truck/train) are treated as generic obstacles —
-# they alert as "obstacle ahead" rather than being called out by vehicle type.
 YOLO_CLASS_MAP: Final[dict[str, ObjectClass]] = {
     "person": ObjectClass.PERSON,
     "bicycle": ObjectClass.BICYCLE,
-    "car": ObjectClass.OBSTACLE,
-    "motorcycle": ObjectClass.OBSTACLE,
-    "bus": ObjectClass.OBSTACLE,
-    "truck": ObjectClass.OBSTACLE,
-    "train": ObjectClass.OBSTACLE,
     "chair": ObjectClass.OBSTACLE,
     "bottle": ObjectClass.OBSTACLE,
     "umbrella": ObjectClass.OBSTACLE,

@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from core.config import Config
-from core.constants import YOLO_CLASS_MAP
+from core.constants import YOLO_CLASS_MAP, YOLO_IGNORED_CLASSES
 from core.exceptions import DetectionError
 from core.types import ObjectClass
 from utils.logger import get_logger
@@ -82,6 +82,9 @@ class YoloDetector:
             names = getattr(result, "names", {})
             for box in getattr(result, "boxes", []):
                 raw_name = names.get(int(box.cls[0]), "unknown")
+                # Drop ignored classes (vehicles) entirely — no box, no alert.
+                if raw_name in YOLO_IGNORED_CLASSES:
+                    continue
                 predictions.append(
                     YoloPrediction(
                         object_class=YOLO_CLASS_MAP.get(raw_name, ObjectClass.OBSTACLE),
