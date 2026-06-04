@@ -9,7 +9,6 @@ knows about concrete service / sensor classes.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
 
 from core.config import Config
 from detection.alert_engine import AlertEngine
@@ -24,11 +23,8 @@ from sensors import (
 )
 from services import (
     DetectionService,
-    ElectricalLoggerService,
     LocationService,
     MessageService,
-    MetricsService,
-    MovementAnalyzer,
     OutputService,
     SessionService,
     SosService,
@@ -38,7 +34,6 @@ from storage import (
     CommandRepository,
     Database,
     DetectionRepository,
-    ElectricalRepository,
     LocationRepository,
     MessageRepository,
     SessionRepository,
@@ -59,10 +54,7 @@ class Container:
     output_service: OutputService
     message_service: MessageService
     session_service: SessionService
-    electrical_logger: ElectricalLoggerService
     sos_service: SosService
-    metrics_service: MetricsService
-    movement_analyzer: MovementAnalyzer
     frame_buffer: FrameBuffer
 
     def start_all(self) -> None:
@@ -70,16 +62,12 @@ class Container:
         self.output_queue.start()
         self.location_service.start()
         self.detection_service.start()
-        self.electrical_logger.start()
         self.sos_service.start()
-        self.metrics_service.start()
         log.info("background services started")
 
     def stop_all(self) -> None:
         log = get_logger("api.container")
-        self.metrics_service.stop()
         self.sos_service.stop()
-        self.electrical_logger.stop()
         self.detection_service.stop()
         self.location_service.stop()
         self.output_service.stop()
@@ -102,7 +90,6 @@ def build_container() -> Container:
     message_repo = MessageRepository(database)
     alert_repo = AlertRepository(database)
     session_repo = SessionRepository(database)
-    electrical_repo = ElectricalRepository(database)
 
     # SPI link to the ESP32 sensor hub — shared by the telemetry sensor
     # (reads) and the haptics / buzzer controllers (command overrides).
@@ -112,13 +99,6 @@ def build_container() -> Container:
     buzzer = BuzzerController(link=spi_link)
     speaker = SpeakerController()
     output_queue = OutputQueue()
-
-    # Central place for the demo latency metrics. Logs each one as a
-    # structured INFO line and keeps a rolling history for /api/metrics.
-    # The LSTM sequence-data heartbeat (configured further down, once
-    # location_service exists) shows how much trajectory input the future
-    # TrajectoryService would have available right now.
-    metrics_service = MetricsService()
 
     output_service = OutputService(
         haptics=haptics,
@@ -152,46 +132,19 @@ def build_container() -> Container:
         output=output_service,
         detection_repo=detection_repo,
         alert_repo=alert_repo,
-        metrics=metrics_service,
     )
 
     location_service = LocationService(telemetry=telemetry, repository=location_repo)
 
-    electrical_logger = ElectricalLoggerService(
-        repository=electrical_repo,
-        fps_callback=detection_service.fps,
-        inference_ms_callback=detection_service.inference_time_ms,
-    )
-
     sos_service = SosService(
         telemetry=telemetry,
         location_getter=location_service.latest,
-        metrics=metrics_service,
     )
     # Let OutputService suppress detection haptics+buzzer while the SOS
     # button is held; earpiece TTS keeps flowing for guardian messages.
     output_service.set_sos_active_getter(sos_service.is_active)
 
-    # LSTM movement analyzer. Subscribes to the detection callback fan-out
-    # (so it doesn't displace DetectionService's own dispatch) and emits
-    # navigational narration via SpeechPriority.LSTM. Each narration also
-    # lands in the telemetry CSV via MetricsService.
-    movement_analyzer = MovementAnalyzer(output=output_service, metrics=metrics_service)
-    detection_service.add_listener(movement_analyzer.on_detections)
-
-    # Late-bind the LSTM heartbeat data source. Reports how much
-    # trajectory input the MovementAnalyzer has available right now.
-    def _trajectory_snapshot() -> dict[str, Any]:
-        from utils.converters import unix_timestamp
-
-        since = unix_timestamp() - 3600
-        recent = location_repo.since(since)
-        return {
-            "window_size": len(recent),
-            "distance_today_km": round(location_service.distance_today_km(), 3),
-        }
-
-    metrics_service.set_trajectory_snapshot(_trajectory_snapshot)
+    # LSTM navigation removed — needs working GPS first.
 
     return Container(
         database=database,
@@ -202,10 +155,7 @@ def build_container() -> Container:
         output_service=output_service,
         message_service=message_service,
         session_service=session_service,
-        electrical_logger=electrical_logger,
         sos_service=sos_service,
-        metrics_service=metrics_service,
-        movement_analyzer=movement_analyzer,
         frame_buffer=frame_buffer,
     )
 

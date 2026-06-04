@@ -26,8 +26,6 @@ export const POLL_INTERVALS = {
   status: 3_000,
   detections: 5_000,
   cameraFrame: 1_000,
-  navigationLog: 4_000,
-  recognitionLog: 4_000,
 } as const;
 
 export const REQUEST_TIMEOUT_MS = 5_000;

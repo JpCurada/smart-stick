@@ -21,7 +21,6 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { POLL_INTERVALS } from '@/constants/api';
 import { Palette } from '@/constants/theme';
-import { useEffectiveLocation } from '@/hooks/use-effective-location';
 import { usePoll } from '@/hooks/use-poll';
 import { api } from '@/lib/api';
 
@@ -39,11 +38,9 @@ interface FeedbackState {
 
 export default function FindScreen() {
   const location = usePoll(useCallback(() => api.location(), []), POLL_INTERVALS.location);
-  const effective = useEffectiveLocation(location.data);
-  const lat = effective.latitude;
-  const lon = effective.longitude;
+  const lat = typeof location.data?.latitude === 'number' ? location.data.latitude : null;
+  const lon = typeof location.data?.longitude === 'number' ? location.data.longitude : null;
   const hasFix = lat != null && lon != null;
-  const onPhone = effective.source === 'phone';
 
   const [pending, setPending] = useState<Pending>(null);
   const [feedback, setFeedback] = useState<FeedbackState | null>(null);
@@ -86,12 +83,11 @@ export default function FindScreen() {
 
         {hasFix ? (
           <View style={styles.mapWrap}>
-            {onPhone && (
-              <ThemedText style={styles.sourceNote}>
-                Showing this phone&apos;s location — the stick has no GPS fix yet.
-              </ThemedText>
-            )}
-            <LeafletMap latitude={lat} longitude={lon} accuracyM={effective.accuracyM} />
+            <LeafletMap
+              latitude={lat}
+              longitude={lon}
+              accuracyM={location.data?.accuracy_m ?? null}
+            />
           </View>
         ) : (
           <ThemedView style={styles.mapPlaceholder}>
@@ -145,11 +141,6 @@ const styles = StyleSheet.create({
   },
   subtitle: { opacity: 0.7 },
   mapWrap: { gap: 8 },
-  sourceNote: {
-    fontSize: 13,
-    opacity: 0.8,
-    textAlign: 'center',
-  },
   mapPlaceholder: {
     height: 280,
     borderRadius: 12,

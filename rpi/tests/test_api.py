@@ -78,18 +78,11 @@ def _build_test_container(database):
 
     session_service = SessionService(repository=SessionRepository(database))
     message_service = MessageService(output=output_service, repository=message_repo)
-    electrical_logger = MagicMock()
     frame_buffer = MagicMock()
 
     sos_service = MagicMock()
     sos_service.fire_test.return_value = {"published": True}
     sos_service.latest_event.return_value = None
-
-    metrics_service = MagicMock()
-    metrics_service.snapshot.return_value = {}
-
-    movement_analyzer = MagicMock()
-    movement_analyzer.recent.return_value = []
 
     return Container(
         database=database,
@@ -100,10 +93,7 @@ def _build_test_container(database):
         output_service=output_service,
         message_service=message_service,
         session_service=session_service,
-        electrical_logger=electrical_logger,
         sos_service=sos_service,
-        metrics_service=metrics_service,
-        movement_analyzer=movement_analyzer,
         frame_buffer=frame_buffer,
     )
 

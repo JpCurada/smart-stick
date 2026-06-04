@@ -42,28 +42,6 @@ def detections_history(
     return {"detections": DetectionRepository(c.database).since(since)}
 
 
-@router.get("/recognition_log")
-def recognition_log(
-    limit: int = Query(default=50, ge=1, le=200),
-    c: Container = Depends(_container),
-) -> dict[str, Any]:
-    return {
-        "entries": c.detection_service.recent_recognitions(limit=limit),
-        "timestamp": iso_timestamp(),
-    }
-
-
-@router.get("/navigation_log")
-def navigation_log(
-    limit: int = Query(default=50, ge=1, le=200),
-    c: Container = Depends(_container),
-) -> dict[str, Any]:
-    return {
-        "entries": c.movement_analyzer.recent(limit=limit),
-        "timestamp": iso_timestamp(),
-    }
-
-
 # --------------------------- Location ---------------------------------------- #
 
 
@@ -206,23 +184,8 @@ def find_my_stick(
     ``mode`` selects the cue: "both" (buzz+vibrate), "vibrate" (vibrator
     only), or "buzz" (buzzer only).
     """
-    import time as _time
-
-    command_label = {"both": "buzz+vibrate", "vibrate": "vibrate", "buzz": "buzz"}[mode]
-    start = _time.monotonic()
     command_id = c.output_service.find_my_stick(mode=mode)
-    latency_ms = (_time.monotonic() - start) * 1000.0
-    c.metrics_service.record_find_my_stick(latency_ms=latency_ms, command=command_label)
     return CommandAck(success=True, command_id=command_id)
-
-
-# --------------------------- Metrics ----------------------------------------- #
-
-
-@router.get("/metrics")
-def metrics_snapshot(c: Container = Depends(_container)) -> dict[str, Any]:
-    """Return a per-metric rolling summary for the demo dashboard."""
-    return c.metrics_service.snapshot()
 
 
 # --------------------------- SOS test ---------------------------------------- #
