@@ -1,13 +1,14 @@
 /**
  * Foreground SOS banner shown on the Home tab when the cane's most recent
- * alert is type "sos". Tapping the banner opens Google Maps at the cane's
- * last known location and the in-app Location tab.
+ * alert is type "sos". Its two actions stay inside the app: "Open in Maps"
+ * jumps to the Location tab (the in-app map) and "Live View" jumps to the
+ * Video tab (the live camera feed).
  *
  * Push notifications cover the lock-screen / backgrounded case; this
  * component covers the case where the guardian already has the app open.
  */
 import { router } from 'expo-router';
-import { Linking, Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { Palette } from '@/constants/theme';
@@ -36,13 +37,11 @@ export function SosBanner({ visible, location, triggeredAt, onDismiss }: Props) 
     : 'Unknown (no GPS fix yet)';
 
   const openMaps = () => {
-    if (!hasCoords) return;
-    const url = `https://maps.google.com/?q=${lat.toFixed(6)},${lng.toFixed(6)}`;
-    Linking.openURL(url).catch((err) => console.warn('failed to open maps:', err));
+    router.push('/(tabs)/location');
   };
 
   const openLiveView = () => {
-    router.push('/(tabs)/location');
+    router.push('/(tabs)/video');
   };
 
   return (
@@ -60,11 +59,7 @@ export function SosBanner({ visible, location, triggeredAt, onDismiss }: Props) 
       <View style={styles.actions}>
         <Pressable
           onPress={openMaps}
-          style={({ pressed }) => [
-            styles.button,
-            { opacity: hasCoords ? (pressed ? 0.7 : 1) : 0.4 },
-          ]}
-          disabled={!hasCoords}
+          style={({ pressed }) => [styles.button, { opacity: pressed ? 0.7 : 1 }]}
         >
           <ThemedText style={styles.buttonText}>Open in Maps</ThemedText>
         </Pressable>

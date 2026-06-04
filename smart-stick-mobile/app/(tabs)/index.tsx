@@ -81,6 +81,11 @@ export default function HomeScreen() {
           />
         </View>
 
+        <ThemedView style={styles.card}>
+          <ThemedText type="subtitle">Navigation</ThemedText>
+          <ThemedText style={styles.cardNote}>Only works when GPS is turned on</ThemedText>
+        </ThemedView>
+
         {!online && (
           <ThemedView style={styles.errorCard}>
             <ThemedText style={styles.errorTitle}>Stick unreachable</ThemedText>
@@ -105,6 +110,16 @@ const styles = StyleSheet.create({
   },
   section: {
     gap: 4,
+  },
+  card: {
+    padding: 16,
+    borderRadius: 12,
+    gap: 4,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(127,127,127,0.3)',
+  },
+  cardNote: {
+    opacity: 0.6,
   },
   errorCard: {
     padding: 14,

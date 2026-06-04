@@ -86,4 +86,11 @@ class AlertEngine:
 
     @staticmethod
     def _speak_text(detection: Detection) -> str | None:
-        return f"{detection.object_class.value} ahead, {detection.distance_m:.1f} meters"
+        # Only announce a distance when it came from a real distance sensor
+        # (LiDAR / ultrasonic). Camera-only detections have no measured range —
+        # speaking a fabricated number (the 99.0 m "no fix" fallback or a rough
+        # bbox estimate) would mislead the user — so just name the obstacle.
+        name = detection.object_class.value
+        if detection.distance_source in ("lidar", "ultrasonic"):
+            return f"{name} ahead, {detection.distance_m:.1f} meters"
+        return f"{name} ahead"

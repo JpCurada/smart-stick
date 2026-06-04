@@ -114,7 +114,7 @@ class Config:
     HAPTICS_PIN: Final[int] = _env_int("HAPTICS_PIN", 26)
     BUZZER_PIN: Final[int] = _env_int("BUZZER_PIN", 27)
 
-    ALERT_COOLDOWN_S: Final[float] = _env_float("ALERT_COOLDOWN_S", 3.0)
+    ALERT_COOLDOWN_S: Final[float] = _env_float("ALERT_COOLDOWN_S", 1.0)
     ELECTRICAL_LOG_INTERVAL_S: Final[int] = _env_int("ELECTRICAL_LOG_INTERVAL_S", 30)
 
     TTS_ENABLED: Final[bool] = _env_bool("TTS_ENABLED", True)

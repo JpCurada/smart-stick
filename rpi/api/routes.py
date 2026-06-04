@@ -113,18 +113,26 @@ def latest_frame(c: Container = Depends(_container)) -> Response:
 def stream(c: Container = Depends(_container)) -> StreamingResponse:
     boundary = "frame"
 
+    def _part(jpeg: bytes) -> bytes:
+        return (
+            b"--" + boundary.encode() + b"\r\n"
+            b"Content-Type: image/jpeg\r\n"
+            b"Content-Length: " + str(len(jpeg)).encode() + b"\r\n\r\n" + jpeg + b"\r\n"
+        )
+
     def generator():
+        # When detection is slow (YOLO can take a while on the RPi CPU) the
+        # buffer may not produce a NEW frame for a stretch. A plain MJPEG <img>
+        # that stops receiving bytes freezes then goes black. So if no new frame
+        # arrives within the wait window, RE-SEND the most recent frame as a
+        # keep-alive: the connection keeps flowing and never stalls.
         last_ts = 0.0
         while True:
             jpeg, ts = c.frame_buffer.wait_for_new(last_ts, timeout_s=1.0)
-            if jpeg is None or ts == last_ts:
+            if jpeg is None:
                 continue
             last_ts = ts
-            yield (
-                b"--" + boundary.encode() + b"\r\n"
-                b"Content-Type: image/jpeg\r\n"
-                b"Content-Length: " + str(len(jpeg)).encode() + b"\r\n\r\n" + jpeg + b"\r\n"
-            )
+            yield _part(jpeg)
 
     return StreamingResponse(
         generator(),

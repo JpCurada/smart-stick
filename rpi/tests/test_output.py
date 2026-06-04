@@ -151,8 +151,9 @@ class _GatedSpeaker:
 class TestSpeechHierarchy:
     """Earpiece is a single live slot: strict tier, never a queue.
 
-    Guardian (rank 0) > LSTM (1) > Detection (2). A strictly-higher tier
-    drops a newcomer; equal-or-higher interrupts and replaces.
+    Guardian (rank 0) > LSTM (1) > Detection (2). Only a STRICTLY-higher tier
+    interrupts what's speaking; an equal-or-lower tier newcomer is dropped so
+    the current utterance finishes (rapid detections don't clip each other).
     """
 
     def _service(self, speaker: _GatedSpeaker) -> tuple[OutputService, OutputQueue]:
@@ -207,16 +208,21 @@ class TestSpeechHierarchy:
             speaker.release()
             queue.stop()
 
-    def test_equal_tier_newest_replaces(self) -> None:
+    def test_equal_tier_lets_current_finish(self) -> None:
+        # Equal tier must NOT interrupt: the in-flight utterance finishes and
+        # the newcomer is dropped. This is what keeps rapid detection alerts
+        # from cutting each other off into clipped fragments.
         speaker = _GatedSpeaker()
         svc, queue = self._service(speaker)
         try:
-            svc.speak("lstm old", source=SpeechPriority.LSTM)
-            assert speaker.wait_started()
-            svc.speak("lstm new", source=SpeechPriority.LSTM)
-            assert self._wait_for(speaker, "lstm new")
-        finally:
+            svc.speak("detection one", source=SpeechPriority.DETECTION)
+            assert speaker.wait_started()  # first alert is live (blocking)
+            # Second alert arrives while the first speaks -> DROPPED, not played.
+            svc.speak("detection two", source=SpeechPriority.DETECTION)
             speaker.release()
+            queue.stop()
+            assert speaker.played == ["detection one"]
+        finally:
             queue.stop()
 
     def test_speech_does_not_use_shared_feedback_queue(self) -> None:

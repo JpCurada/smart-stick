@@ -14,9 +14,7 @@ class Environment(str, Enum):
 
 class ObjectClass(str, Enum):
     PERSON = "person"
-    CAR = "car"
     BICYCLE = "bicycle"
-    MOTORCYCLE = "motorcycle"
     STAIRS = "stairs"
     OVERHEAD = "overhead"
     OBSTACLE = "obstacle"

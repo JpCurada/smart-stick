@@ -175,7 +175,7 @@ class TestAlertEngine:
 
     def test_rate_limited_second_call(self) -> None:
         engine = AlertEngine(cooldown_s=5.0)
-        detection = Detection(object_class=ObjectClass.CAR, confidence=0.9, distance_m=1.0)
+        detection = Detection(object_class=ObjectClass.OBSTACLE, confidence=0.9, distance_m=1.0)
         first = engine.evaluate(detection)
         second = engine.evaluate(detection)
         assert first.triggered
@@ -189,10 +189,27 @@ class TestAlertEngine:
         decision = engine.evaluate(detection)
         assert decision.severity == AlertSeverity.CRITICAL
 
-    def test_speak_text_includes_distance(self) -> None:
+    def test_speak_text_includes_distance_from_real_sensor(self) -> None:
         engine = AlertEngine(cooldown_s=0.0)
-        detection = Detection(object_class=ObjectClass.CAR, confidence=0.9, distance_m=1.5)
+        detection = Detection(
+            object_class=ObjectClass.OBSTACLE,
+            confidence=0.9,
+            distance_m=1.5,
+            distance_source="lidar",
+        )
         decision = engine.evaluate(detection)
         assert decision.speak_text is not None
         assert "1.5" in decision.speak_text
-        assert "car" in decision.speak_text
+        assert "obstacle" in decision.speak_text
+
+    def test_speak_text_omits_distance_when_camera_only(self) -> None:
+        # No LiDAR/ultrasonic reading -> no fabricated distance is spoken.
+        engine = AlertEngine(cooldown_s=0.0)
+        detection = Detection(
+            object_class=ObjectClass.OBSTACLE,
+            confidence=0.9,
+            distance_m=1.5,
+            distance_source="camera",
+        )
+        decision = engine.evaluate(detection)
+        assert decision.speak_text == "obstacle ahead"

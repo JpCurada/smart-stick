@@ -10,13 +10,7 @@ VIBRATION_PATTERNS: Final[dict[ObjectClass, VibrationPattern]] = {
     ObjectClass.PERSON: VibrationPattern(
         name="single_pulse", intensity=255, duration_ms=200, pulses=1
     ),
-    ObjectClass.CAR: VibrationPattern(
-        name="double_pulse", intensity=200, duration_ms=150, pulses=2, gap_ms=100
-    ),
     ObjectClass.BICYCLE: VibrationPattern(
-        name="triple_pulse", intensity=180, duration_ms=100, pulses=3, gap_ms=50
-    ),
-    ObjectClass.MOTORCYCLE: VibrationPattern(
         name="triple_pulse", intensity=180, duration_ms=100, pulses=3, gap_ms=50
     ),
     ObjectClass.STAIRS: VibrationPattern(name="steady", intensity=220, duration_ms=500, pulses=1),
@@ -48,9 +42,7 @@ BUZZER_TONES: Final[dict[str, BuzzerTone]] = {
 
 DISTANCE_THRESHOLDS_M: Final[dict[ObjectClass, float]] = {
     ObjectClass.PERSON: 2.0,
-    ObjectClass.CAR: 3.0,
     ObjectClass.BICYCLE: 2.5,
-    ObjectClass.MOTORCYCLE: 2.5,
     ObjectClass.STAIRS: 1.0,
     ObjectClass.OVERHEAD: 0.5,
     ObjectClass.OBSTACLE: 1.5,
@@ -69,14 +61,16 @@ QUICK_MESSAGES: Final[tuple[str, ...]] = (
 
 
 # YOLO COCO classes mapped to our internal ObjectClass enum.
+# Vehicles (car/motorcycle/bus/truck/train) are treated as generic obstacles —
+# they alert as "obstacle ahead" rather than being called out by vehicle type.
 YOLO_CLASS_MAP: Final[dict[str, ObjectClass]] = {
     "person": ObjectClass.PERSON,
     "bicycle": ObjectClass.BICYCLE,
-    "car": ObjectClass.CAR,
-    "motorcycle": ObjectClass.MOTORCYCLE,
-    "bus": ObjectClass.CAR,
-    "truck": ObjectClass.CAR,
-    "train": ObjectClass.CAR,
+    "car": ObjectClass.OBSTACLE,
+    "motorcycle": ObjectClass.OBSTACLE,
+    "bus": ObjectClass.OBSTACLE,
+    "truck": ObjectClass.OBSTACLE,
+    "train": ObjectClass.OBSTACLE,
     "chair": ObjectClass.OBSTACLE,
     "bottle": ObjectClass.OBSTACLE,
     "umbrella": ObjectClass.OBSTACLE,

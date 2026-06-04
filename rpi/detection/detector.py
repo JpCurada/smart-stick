@@ -181,9 +181,7 @@ class DetectionLoop:
     def _class_color(object_class: ObjectClass) -> tuple[int, int, int]:
         palette: dict[ObjectClass, tuple[int, int, int]] = {
             ObjectClass.PERSON: (0, 200, 0),
-            ObjectClass.CAR: (0, 140, 255),
             ObjectClass.BICYCLE: (255, 140, 0),
-            ObjectClass.MOTORCYCLE: (255, 140, 0),
         }
         return palette.get(object_class, (60, 60, 220))
 

@@ -207,14 +207,18 @@ class OutputService:
         params = {"text": text, "priority": priority, "source": source.value}
         speech_priority = source
 
-        # Strict hierarchy, single live slot — no queue. Drop the newcomer
-        # only if a STRICTLY higher tier is currently speaking. Otherwise it
-        # wins: equal-or-higher tier interrupts whatever is live (newest wins
-        # at equal tier). `my_gen` lets the queued action detect that an even
-        # newer speak superseded it before it got a turn.
+        # Strict hierarchy, single live slot — no queue. A newcomer wins ONLY
+        # if it is a STRICTLY higher tier than what's currently speaking; then
+        # it interrupts so the more important message is heard at once. At
+        # equal tier (e.g. one detection alert after another) we let the
+        # current utterance FINISH and drop the newcomer — otherwise rapid
+        # detections keep cutting each other off and you hear clipped fragments
+        # ("obst— obst—") instead of complete "obstacle ahead, N meters"
+        # phrases. `my_gen` lets the queued action detect that an even newer
+        # higher-tier speak superseded it before it got a turn.
         with self._speech_lock:
             active = self._active_speech_priority
-            if active is not None and speech_priority.rank > active.rank:
+            if active is not None and speech_priority.rank >= active.rank:
                 self._log.debug(
                     "speech %s (%s) dropped — %s is speaking",
                     message_id,
@@ -226,7 +230,7 @@ class OutputService:
             my_gen = self._speech_generation
             self._active_speech_priority = speech_priority
 
-        # Interrupt whatever is mid-utterance so the winner is heard at once.
+        # Interrupt whatever is mid-utterance so the higher-tier winner is heard.
         self._speaker.stop()
 
         def action() -> None:
