@@ -167,7 +167,6 @@ class FakeYoloDetector:
 
         classes = [
             ObjectClass.PERSON,
-            ObjectClass.CAR,
             ObjectClass.BICYCLE,
             ObjectClass.OBSTACLE,
         ]
